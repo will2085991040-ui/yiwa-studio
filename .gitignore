@@ -38,3 +38,8 @@ backend/dist/
 
 # local scratch
 _probe.py
+
+# scratch/build output
+pytest_out.txt
+*.tsbuildinfo
+backend/app/core/config_secret_placeholder.txt
