@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """一键生成完整互动剧本（script_writer）。
 
 复用既有 LLM Provider + Trace + Artifact 版本体系：
@@ -86,7 +85,7 @@ async def generate_script(
                     session, run, agent="script_writer", step_key="llm.error",
                     input_data={"attempt": attempt + 1}, output_data={}, error=exc.error.message, status="failed",
                 )
-                raise NotFoundError(f"剧本模型调用失败：{exc.error.message}")
+                raise NotFoundError(f"剧本模型调用失败：{exc.error.message}") from exc
             if response is None:
                 raise NotFoundError("剧本模型未返回任何输出")
             raw = response.data or {}

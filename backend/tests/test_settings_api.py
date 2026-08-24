@@ -69,7 +69,6 @@ def test_llm_timeout_seconds_persists_and_clamped(client, monkeypatch, tmp_path)
     assert resp.status_code == 200, resp.text
     assert resp.json()["values"]["llm_timeout_seconds"] == 300
     # 落库到 config.json，重启后可用
-    import json as _json
     from desktop.config import load_config
     cfg = load_config(str(tmp_path / "config.json"))
     assert cfg.llm_timeout_seconds == 300

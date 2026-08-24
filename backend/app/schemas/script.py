@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """互动剧本 Schema（一键生成剧本 API 使用）。
 
 产物：一部完整互动剧本（立即可用于拍摄/配音的「分场剧本+对白」）。
 结构：Scene 含多条 Beat（一条 Beat = 一个镜头/对白单元），并附角色表与结构元信息。
 由 app/services/script_writer.py 调和（generate_structured + 落库 Artifact kind="script"）。
 """
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 

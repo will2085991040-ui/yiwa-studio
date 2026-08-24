@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """API 路由：一键生成完整互动剧本（POST /api/projects/{project_id}/script）。
 
 输入一句话创意（goal），用剧本专用模型直接产出并落库一份互动剧本文案（kind="script"）。

@@ -24,7 +24,6 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.llm.pricing import estimate_cost
-from app.services.credits import charge_from_context
 from app.llm.types import (
     LLMEmbeddingResult,
     LLMError,
@@ -35,6 +34,7 @@ from app.llm.types import (
     LLMUsage,
     estimate_tokens,
 )
+from app.services.credits import charge_from_context
 
 
 class LLMResult(BaseModel):

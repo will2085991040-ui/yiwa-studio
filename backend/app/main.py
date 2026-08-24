@@ -30,9 +30,8 @@ from app.api.v1.workspace import router as workspace_router
 from app.api.v1.world_play import router as world_play_router
 from app.core.errors import install_error_handlers
 from app.core.logging import setup_logging
-from app.services.auth import require_user
-from app.services.auth import verify_token
 from app.services import credits as credits_service
+from app.services.auth import require_user, verify_token
 
 setup_logging()
 

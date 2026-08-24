@@ -6,14 +6,13 @@
 - 扣费：points = 引擎成本(RMB) / markup；markup 默认 0.6（等价 ×1.667，含 40% 毛利）。
 - 余额允许为负（不阻塞既有工作流）。
 """
+import contextvars
+import logging
 import secrets
 import string
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
-import contextvars
-import logging
-from typing import Optional
 
 from app.db.base import SessionLocal
 
@@ -46,12 +45,11 @@ def charge_from_context(model: str, provider: str, input_tokens: int, output_tok
         finally:
             s.close()
     except Exception as exc:  # noqa: BLE001 - 扣费失败不影响主流程
-        _logger.warning("charge_from_context failed: %s", exc)
+        _log.warning("charge_from_context failed: %s", exc)
 
 
-from app.core.errors import AppError
-from app.models import CreditLedger, CreditPrice, RedeemCode, User
-
+from app.core.errors import AppError  # noqa: E402
+from app.models import CreditLedger, CreditPrice, RedeemCode, User  # noqa: E402
 
 # 默认单价（人民币 / 1M tokens）：配表缺失时兜底。
 DEFAULT_PRICES: dict[str, tuple[float, float]] = {

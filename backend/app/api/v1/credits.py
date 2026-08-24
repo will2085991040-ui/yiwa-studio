@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.db.base import get_session
 from app.models import CreditPrice, User
-from app.services.auth import require_user_strict
 from app.services import credits as creds
+from app.services.auth import require_user_strict
 
 router = APIRouter(prefix="/api/credits", tags=["credits"])
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """生视频：支持 阿里DashScope happyhorse / 火山Seedance / YIWA网关 / mock。
 
 - dashscope : 阿里云百炼视频合成（原生异步任务，happyhorse-1.1-t2v 等 t2v）
@@ -11,12 +10,11 @@
 provider=mock 或未配置 key 时回退 mock。
 """
 import uuid
-from typing import Any
 
 import httpx
 
 from app.core.config import settings
-from app.media.types import MediaError, VideoRequest, VideoResult, VideoTask
+from app.media.types import MediaError, VideoResult, VideoTask
 
 _TERMINAL = ("succeeded", "failed")
 _DASHSCOPE_ROOT = "https://dashscope.aliyuncs.com/api/v1"

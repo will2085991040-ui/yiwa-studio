@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """API: 资产（Assets）——各 Agent 产出汇总为资产列表。
 
 GET /api/assets                : 全部项目的最新资产
@@ -56,7 +55,7 @@ def _url(value, depth=0):
                 u = _url(value[k], depth + 1)
                 if u:
                     return u
-    elif isinstance(value, (list, tuple)):
+    elif isinstance(value, list | tuple):
         for it in value:
             u = _url(it, depth + 1)
             if u:
