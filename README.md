@@ -11,6 +11,10 @@
 ## 一句话定位
 > 不只会调 LLM API——能把 AI 应用从零搭到可商用：**Agent 编排 + 结构化输出 + 引擎级 token 计费 + 双端/桌面发布**，且在「不破坏既有功能」的约束下做增量工程。
 
+## 文档导航
+- [**ARCHITECTURE.md**](ARCHITECTURE.md) — 一页看懂架构与两大创新点(Agent 编排 + 引擎级计费)
+- [docs/billing-architecture.md](docs/billing-architecture.md) — 点数计费体系与收费流图
+
 ## 项目亮点
 - 一个仓库实现端到端 LLM 应用：Next.js 前端 + FastAPI 后端 + SQLite 存储 + PyInstaller 桌面打包。
 - 多 Agent + 可视化：剧情/角色/分镜/关系图谱/小游戏的 AI 创作与可视化编辑。
