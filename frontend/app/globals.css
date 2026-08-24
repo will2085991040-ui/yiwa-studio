@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scrollbar-color: #2a2c4a #0b0d1a;
+}
+body {
+  background:
+    radial-gradient(1200px 700px at 15% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(1100px 650px at 110% 10%, rgba(34, 211, 238, 0.12), transparent 55%),
+    radial-gradient(1000px 800px at 50% 120%, rgba(244, 114, 182, 0.08), transparent 60%),
+    linear-gradient(160deg, #070810 0%, #0a0c16 45%, #070811 100%) fixed;
+  color: #f1f0fb;
+}

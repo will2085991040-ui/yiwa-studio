@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+
+# Env & secrets
+.env
+.env.local
+*.pem
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# DB / logs
+*.db
+*.log
+# ---- PyInstaller / build artifacts ----
+build/
+dist/
+backend/build/
+backend/dist/
+*.exe
+*.db-wal
+*.db-shm
+
+# local scratch
+_probe.py
