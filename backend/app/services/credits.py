@@ -5,6 +5,7 @@
 - 兑换码：运营 mint() 生成，用户 redeem() 兑换入账。
 - 扣费：points = 引擎成本(RMB) / markup；markup 默认 0.6（等价 ×1.667，含 40% 毛利）。
 - 余额允许为负（不阻塞既有工作流）。
+- 整体架构与数据流见 docs/billing-architecture.md。
 """
 import contextvars
 import logging

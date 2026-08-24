@@ -72,4 +72,16 @@
 | 按节点独立版本链 | implemented | Artifact kind=`scene:{node_id}`（scene:a 的 v2 不影响 scene:b）；kind 列 40→120 |
 | 锁定节点保护 | implemented | 锁定 SceneNode 生成/修改/扩写一律 409 locked_node（不静默覆盖） |
 | 场景可视化 | implemented | 工作台按节点选择并渲染场景卡 + 版本/来源徽章 |
-| 资产需求（图/音/视频） | planned(字段预留) | SceneContent.asset_requirements，多模态 API 留待后续 Step |
+| 资产需求（图/音/视频） | planned(字段预留) | SceneContent.asset_requirements，多模态 API，留待后续 Step |
+
+## Monetization / Billing（点数计费）
+
+| 能力 | 状态 | 说明 |
+| --- | --- | --- |
+| 引擎级单价配表 | implemented | CreditPrice(model, input_price, output_price, markup)，元/百万 token，后台 /prices 可调 |
+| 请求级上下文计费 | implemented | FastAPI 中间件解析 Bearer → Async ContextVar(请求作用域)，LLM 结算点据此同步扣费 |
+| 可插拔结算钩子 | implemented | Provider 拿到 usage 后 best-effort 扣费，无上下文就不记、绝不 throw，存量接口零改动(charge_from_context) |
+| 兑换码充值 | implemented | 运营 mint → 用户 redeem，防重/防伪/一次性 |
+| 消费扣点与流水 | implemented | charge_for_usage：成本单价 ÷ markup → 扣点；credit_ledger 全量流水可溯源 |
+| 余额可为负 | implemented | 欠费可继续使用，仅记流水并 warning，不阻断既有工作流 |
+| 部署形态 | implemented | 同一后端 → Web 部署 + 单文件桌面 EXE（PyWebView 内嵌） |

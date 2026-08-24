@@ -60,6 +60,7 @@ tool_permissions / allowed_topics / forbidden_topics / runtime_state / portrait`
 - **Evaluation**：规则 + LLM-as-Judge，输出 Agent Health Score（任务/对话质量/一致性/工具/知识接地/互动正确/参与/转化/留存/成本/延迟）；
 - **Optimization**：提案 → 人工审批或 A/B → Evaluation → 发布/回滚（禁止全自动改线上）；
 - **锁定资产**：Character/Prompt/Graph/Strategy 可 locked=true，Optimization 必须尊重。
+- **Billing（计费/充值）**：引擎级点数计费——请求级上下文(Async ContextVar)对 Agent 调用精准记费，兑换码充值、余额可为负、全量流水可溯源。细节见 `docs/billing-architecture.md`。
 
 ## 7. 数据模型（Phase 0 已建）
 

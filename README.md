@@ -6,6 +6,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-14-black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy%20%2B%20alembic-009688)
 ![License](https://img.shields.io/github/license/will2085991040-ui/yiwa-studio)
+![CI](https://img.shields.io/github/actions/workflow/status/will2085991040-ui/yiwa-studio/ci.yml?branch=main)
 
 ## 一句话定位
 > 不只会调 LLM API——能把 AI 应用从零搭到可商用：**Agent 编排 + 结构化输出 + 引擎级 token 计费 + 双端/桌面发布**，且在「不破坏既有功能」的约束下做增量工程。
@@ -59,7 +60,7 @@
 - backend/    FastAPI 后端 + alembic 迁移 + PyInstaller 配置
 - frontend/   Next.js 前端(静态导出 out)
 - desktop/    launcher 与打包配置
-- docs/       文档
+- docs/       架构与设计：architecture / billing-architecture（点数计费）
 - .github/    CI 配置
 
 ## 环境与密钥
