@@ -8,5 +8,6 @@ ignore = ["B008"]  # FastAPI Depends 用法豁免
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # CI 上确保可 import app
 addopts = "-q --cov=app --cov-report=term-missing"
 filterwarnings = ["ignore::DeprecationWarning"]
