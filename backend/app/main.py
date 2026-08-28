@@ -15,6 +15,7 @@ from app.api.v1.media import router as media_router
 from app.api.v1.minigame import router as minigame_router
 from app.api.v1.novel_import import router as novel_import_router
 from app.api.v1.orchestrate import router as orchestrate_router
+from app.api.v1.orders import router as orders_router
 from app.api.v1.play import router as play_router
 from app.api.v1.portraits import router as portraits_router
 from app.api.v1.projects import router as projects_router
@@ -94,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(relations_router, dependencies=[Depends(require_user)])
     app.include_router(assets_router, dependencies=[Depends(require_user)])
     app.include_router(credits_router, dependencies=[Depends(require_user)])
+    app.include_router(orders_router, dependencies=[Depends(require_user)])
 
     # 启动时执行一次幂等 schema 迁移（建表 + users.role 增量列）与管理员 bootstrap。
     # 纯增量、可重复调用；桌面 EXE 与原工作流都不受影响。

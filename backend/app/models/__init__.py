@@ -364,5 +364,26 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="user", nullable=False)
 
 
+class CodeOrder(Base):
+    """点数购买订单 + 可插拔支付渠道。本阶段支付渠道 = manual（人工到账后管理员确认）。"""
+
+    __tablename__ = "code_orders"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)  # wechat|alipay|stripe 后续可插拔
+    status: Mapped[str] = mapped_column(String(20), default="pending_payment", nullable=False)
+    # pending_payment -> paid(已确认收款) -> fulfilled(已发点数)；cancelled 可随时取消
+    amount_yuan: Mapped[float] = mapped_column(Float, nullable=False)     # 用户实付（元）
+    points: Mapped[float] = mapped_column(Float, nullable=False)          # 拟发放点数（1点=1元）
+    payment_ref: Mapped[str] = mapped_column(String(200), default="", nullable=False)  # 用户填的转账备注/单号
+    note: Mapped[str] = mapped_column(String(300), default="", nullable=False)          # 运营备注
+    redeem_code: Mapped[str] = mapped_column(String(64), default="", nullable=False)    # 核销后 mint 的兑换码（留痕）
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+
 # --- 充值点数（增量模块，仅再导出；不改动既有模型） ---
 from app.models.credits import CreditLedger, CreditPrice, RedeemCode  # noqa: E402,F401
