@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.base import get_session
 from app.models import CreditPrice, User
 from app.services import credits as creds
-from app.services.auth import require_user_strict
+from app.services.auth import require_admin, require_user_strict
 
 router = APIRouter(prefix="/api/credits", tags=["credits"])
 
@@ -48,7 +48,7 @@ class MintInput(BaseModel):
 
 
 @router.post("/mint", status_code=201)
-def mint(payload: MintInput, session: Session = Depends(get_session)) -> dict:
+def mint(payload: MintInput, _admin: User = Depends(require_admin), session: Session = Depends(get_session)) -> dict:
     row = creds.mint_code(session, yuan=payload.yuan, points=payload.points, note=payload.note, code=payload.code)
     return {"code": row.code, "yuan": row.yuan, "points": row.points}
 
@@ -71,6 +71,6 @@ class PriceInput(BaseModel):
 
 
 @router.post("/prices")
-def set_prices(payload: PriceInput, session: Session = Depends(get_session)) -> dict:
+def set_prices(payload: PriceInput, _admin: User = Depends(require_admin), session: Session = Depends(get_session)) -> dict:
     row = creds.set_price(session, payload.model, payload.input_price, payload.output_price, payload.markup)
     return {"model": row.model, "input_price": row.input_price, "output_price": row.output_price, "markup": row.markup}

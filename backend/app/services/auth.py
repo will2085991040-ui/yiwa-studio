@@ -19,7 +19,7 @@ from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import AppError, UnauthorizedError
+from app.core.errors import AppError, ForbiddenError, UnauthorizedError
 from app.db.base import get_session
 from app.models import User
 
@@ -140,3 +140,43 @@ def create_user(session: Session, username: str, password: str) -> User:
     session.commit()
     session.refresh(user)
     return user
+
+def require_admin(
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_session),
+) -> User:
+    """始终强制登录 + 必须是 admin（用于 mint 兑换码 / 改引擎单价等后台操作）。"""
+    user_id = None
+    if authorization and authorization.lower().startswith("bearer "):
+        user_id = verify_token(authorization[7:].strip())
+    if not user_id:
+        raise UnauthorizedError("请先登录")
+    user = session.get(User, user_id)
+    if user is None:
+        raise UnauthorizedError("账号不存在或已失效")
+    if user.role != "admin":
+        raise ForbiddenError("需要管理员权限")
+    return user
+
+
+def promote_admins(session: Session) -> None:
+    """幂等地把指定用户提升为 admin（启动时调用）。"""
+    names = [n.strip() for n in (settings.admin_usernames or "").split(",") if n.strip()]
+    changed = False
+    if names:
+        for u in session.query(User).filter(User.username.in_(names)).all():
+            if u.role != "admin":
+                u.role = "admin"
+                changed = True
+    elif not changed:
+        admin_user = session.query(User).filter(User.username == "admin").first()
+        if admin_user is not None and admin_user.role != "admin":
+            admin_user.role = "admin"
+            changed = True
+    if not session.query(User).filter(User.role == "admin").first():
+        first = session.query(User).order_by(User.created_at.asc()).first()
+        if first is not None:
+            first.role = "admin"
+            changed = True
+    if changed:
+        session.commit()

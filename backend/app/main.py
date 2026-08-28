@@ -30,8 +30,9 @@ from app.api.v1.workspace import router as workspace_router
 from app.api.v1.world_play import router as world_play_router
 from app.core.errors import install_error_handlers
 from app.core.logging import setup_logging
+from app.db.base import SessionLocal, ensure_schema
 from app.services import credits as credits_service
-from app.services.auth import require_user, verify_token
+from app.services.auth import promote_admins, require_user, verify_token
 
 setup_logging()
 
@@ -93,6 +94,16 @@ def create_app() -> FastAPI:
     app.include_router(relations_router, dependencies=[Depends(require_user)])
     app.include_router(assets_router, dependencies=[Depends(require_user)])
     app.include_router(credits_router, dependencies=[Depends(require_user)])
+
+    # 启动时执行一次幂等 schema 迁移（建表 + users.role 增量列）与管理员 bootstrap。
+    # 纯增量、可重复调用；桌面 EXE 与原工作流都不受影响。
+    ensure_schema()
+    _session = SessionLocal()
+    try:
+        promote_admins(_session)
+    finally:
+        _session.close()
+
     return app
 
 

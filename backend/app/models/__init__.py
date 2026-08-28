@@ -357,8 +357,11 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 
-    # 充值点数余额（1 点 = 1 元；允许为负，不阻塞有工作流）
+    # 充值点数余额（1 点 = 1 元；允许为负，仅记流水不阻塞主流程）
     credit_balance: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    # 角色：user | admin。admin 才能 mint 兑换码 / 改引擎单价等后台操作。
+    role: Mapped[str] = mapped_column(String(20), default="user", nullable=False)
 
 
 # --- 充值点数（增量模块，仅再导出；不改动既有模型） ---

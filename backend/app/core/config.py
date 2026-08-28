@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # 为空时自动派生自 yiwa_token/主机名 salt（settings 启动后由 auth 模块计算）。
     auth_secret: str = ""
 
+    # 管理员用户名（逗号分隔，可多个）：系统启动时把这些用户提升为 role=admin。
+    # 为空时：若某用户名叫 admin 则提升它；若仍无任何 admin，首次启动时把第一个注册用户提升为 admin。
+    admin_usernames: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

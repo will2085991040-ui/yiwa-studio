@@ -26,6 +26,11 @@ class UnauthorizedError(AppError):
         super().__init__(message, code="unauthorized", status=401)
 
 
+class ForbiddenError(AppError):
+    def __init__(self, message: str = "没有权限执行此操作"):
+        super().__init__(message, code="forbidden", status=403)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError):

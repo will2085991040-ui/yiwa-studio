@@ -39,3 +39,25 @@ def get_session():
         yield session
     finally:
         session.close()
+
+def _table_columns(conn, table_name: str) -> set[str]:
+    """跨 SQLite/PostgreSQL 返回表内已存在列名，用于幂等迁移判断。"""
+    if _is_sqlite:
+        rows = conn.exec_driver_sql(f"PRAGMA table_info({table_name})").all()
+        return {r[1] for r in rows}
+    rows = conn.exec_driver_sql(
+        "SELECT column_name FROM information_schema.columns "
+        f"WHERE table_name = '{table_name}'"
+    ).all()
+    return {r[0] for r in rows}
+
+
+def ensure_schema() -> None:
+    """启动时幂等：建缺失表 + 迁移最小增量字段（如 users.role）。纯增量、可重复调用。"""
+    Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        cols = _table_columns(conn, "users")
+        if not cols:  # users 表都还没建（异常空库），交给 create_all 即可
+            return
+        if "role" not in cols:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user' NOT NULL")
