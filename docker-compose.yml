@@ -34,19 +34,29 @@ services:
     build: ./backend
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql+psycopg2://growth:growth@postgres:5432/growth
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-growth}:${POSTGRES_PASSWORD:-growth}@postgres:5432/${POSTGRES_DB:-growth}
+      # 生产强制登录 + 管理员名单
+      AUTH_REQUIRED: ${AUTH_REQUIRED:-true}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      # 模型提供方（OpenAI 兼容 / 硅基流动 / 火山方舟）
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-mock}
+      IMAGE_API_KEY: ${IMAGE_API_KEY:-}
+      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-mock}
+      VIDEO_API_KEY: ${VIDEO_API_KEY:-}
+      YIWA_TOKEN: ${YIWA_TOKEN:-}
+      YIWA_GATEWAY_URL: ${YIWA_GATEWAY_URL:-}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    # create_app() 启动时自动执行 ensure_schema() + 管理员 bootstrap（不再依赖 alembic 迁移文件）
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
 
   frontend:
     build: ./frontend
