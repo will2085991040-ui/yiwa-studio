@@ -2,6 +2,7 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.account import router as account_router
 from app.api.v1.actions import router as actions_router
 from app.api.v1.assets import router as assets_router
 from app.api.v1.auth import router as auth_router
@@ -10,6 +11,7 @@ from app.api.v1.context_api import router as context_router
 from app.api.v1.credits import router as credits_router
 from app.api.v1.director import router as director_router
 from app.api.v1.if_export import router as if_export_router
+from app.api.v1.legal import router as legal_router
 from app.api.v1.materials import router as materials_router
 from app.api.v1.media import router as media_router
 from app.api.v1.minigame import router as minigame_router
@@ -67,9 +69,10 @@ def create_app() -> FastAPI:
                 credits_service.reset_user_context(ctoken)
         return await call_next(request)
 
-    # auth 路由保持公开（register/login）；其余全部项目/配置接口由 require_user 保护。
+    # auth / legal(隐私·条款) 公开；其余全部项目/配置接口由 require_user 保护。
     # require_user 在 AUTH_REQUIRED=true（生产 EXE）时强制登录，开发/test 放行以保留离线用例。
     app.include_router(auth_router)
+    app.include_router(legal_router)
     app.include_router(projects_router, dependencies=[Depends(require_user)])
     app.include_router(prompts_router, dependencies=[Depends(require_user)])
     app.include_router(director_router, dependencies=[Depends(require_user)])
@@ -96,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(assets_router, dependencies=[Depends(require_user)])
     app.include_router(credits_router, dependencies=[Depends(require_user)])
     app.include_router(orders_router, dependencies=[Depends(require_user)])
+    app.include_router(account_router, dependencies=[Depends(require_user)])
 
     # 启动时执行一次幂等 schema 迁移（建表 + users.role 增量列）与管理员 bootstrap。
     # 纯增量、可重复调用；桌面 EXE 与原工作流都不受影响。
