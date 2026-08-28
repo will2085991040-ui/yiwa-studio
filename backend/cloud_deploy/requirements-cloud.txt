@@ -1,0 +1,10 @@
+# CloudBase/SCF 云函数侧依赖：数据库走 CloudBase MySQL(pymysql)，不走本机 PostgreSQL。
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+pymysql==1.1.1
+cryptography==44.0.0        # pymysql sha256/缓存加密 需要
+pydantic==2.10.4
+pydantic-settings==2.7.0
+httpx==0.28.1
+jsonschema==4.23.0
