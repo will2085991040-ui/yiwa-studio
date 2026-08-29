@@ -526,8 +526,29 @@ export function mintCredit(yuan: number, note = "") {
 export function getCreditPrices() {
   return req<CreditPrices>("/api/credits/prices");
 }
-export function setCreditPrice(payload: { model: string; input_price: number; output_price: number; markup?: number }) {
-  return req<{ model: string; input_price: number; output_price: number; markup: number }>("/api/credits/prices", {
-    method: "POST", body: JSON.stringify(payload),
-  });
+
+// ---- C 分节点小画布：某剧情节点的高发画面 + 文生图 ----
+export type NodeCanvasImage = { url: string; prompt: string; style: string; aspect: string };
+export type NodeCanvasOut = {
+  node_id: string;
+  storyboard: Record<string, unknown>;
+  images: NodeCanvasImage[];
+  video: Record<string, unknown> | null;
+  styles: { key: string; label?: string }[];
+};
+export function getNodeCanvas(projectId: string, nodeId: string) {
+  return req<NodeCanvasOut>(`/api/projects/${projectId}/nodes/${nodeId}/canvas`);
+}
+export function createNodeImage(
+  projectId: string,
+  nodeId: string,
+  payload: { prompt: string; style?: string; aspect?: string; ref_image?: string },
+) {
+  return aiBusy(
+    "小画布生图",
+    (payload.prompt || "").trim().slice(0, 40) || "为节点生成画面…",
+    req<{ url: string }>(`/api/projects/${projectId}/nodes/${nodeId}/images`, {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  );
 }

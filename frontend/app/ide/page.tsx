@@ -8,6 +8,7 @@ import Inspector from "./Inspector";
 import ContentWorkspace from "./ContentWorkspace";
 import VideoPanel from "./VideoPanel";
 import AssetsPanel from "./AssetsPanel";
+import NodeCanvasModal from "./NodeCanvasModal";
 import Playthrough from "./Playthrough";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { KIND_COLOR, latestOf, WORKSPACES, type IdeEdge, type WorkspaceKey } from "./workspace";
@@ -28,6 +29,7 @@ export default function IdePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [videoMode, setVideoMode] = useState(false);
   const [playOpen, setPlayOpen] = useState(false);
+  const [canvasNode, setCanvasNode] = useState<string | null>(null);
   const [posters, setPosters] = useState<Record<string, string>>({}); // node_id -> 该共创分支的海报 image_url（真实验证）
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -226,6 +228,7 @@ export default function IdePage() {
                   onConnect={ide.onConnect}
                   onNodeClick={(id) => setSelectedId(id)}
                   onPaneClick={() => setSelectedId(null)}
+                  onOpenCanvas={(id) => setCanvasNode(id)}
                 />
               </div>
             )
@@ -414,6 +417,14 @@ export default function IdePage() {
           }
         }}
         posters={posters}
+      />
+
+      <NodeCanvasModal
+        open={!!canvasNode}
+        projectId={projectId}
+        nodeId={canvasNode ?? ""}
+        nodeTitle={canvasNode ? (ide.nodes.find((n) => n.id === canvasNode)?.data.title ?? canvasNode) : ""}
+        onClose={() => setCanvasNode(null)}
       />
     </div>
   );

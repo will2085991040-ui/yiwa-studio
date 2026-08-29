@@ -2,7 +2,7 @@
 
 // IDE 中央无限画布：真正的 ReactFlow 节点编辑器（受控组件）。
 // 深紫蓝网格 + 粉紫节点卡片；支撑缩放 / 平移 / 拖动 / 连线 / 框选 / Minimap。
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -30,6 +30,8 @@ import {
 export type { IdeEdge, IdeNode };
 export { KIND_COLOR, KIND_LABEL } from "./workspace";
 
+const NodeUiCtx = createContext<{ onOpenCanvas?: (id: string) => void }>({});
+
 type Badge = { label: string; border: string; bg: string; color: string };
 
 function statusBadge(status?: string, generating?: boolean): Badge {
@@ -50,6 +52,7 @@ function NodeCard({ data }: NodeProps) {
   const d = data as unknown as IdeNode & { isEntry?: boolean };
   const color = KIND_COLOR[d.kind] ?? "#64748b";
   const st = statusBadge(d.status, d.generating);
+  const { onOpenCanvas } = useContext(NodeUiCtx);
   return (
     <div
       style={{
@@ -81,6 +84,12 @@ function NodeCard({ data }: NodeProps) {
       {d.summary ? (
         <div style={{ color: "#9ca3c8", marginTop: 2, lineHeight: 1.35, maxHeight: 52, overflow: "hidden" }}>{d.summary}</div>
       ) : null}
+      {onOpenCanvas ? (
+      <button
+        onClick={(ev) => { ev.stopPropagation(); onOpenCanvas(d.node_id); }}
+        style={{ marginTop: 8, width: "100%", border: "1px solid rgba(168,139,255,.4)", color: "#c9b8ff", background: "rgba(109,90,224,.14)", borderRadius: 8, padding: "3px 0", fontSize: 10, cursor: "pointer", textAlign: "center" }}
+      >🎨 节点小画布</button>
+    ) : null}
       <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 6, color: "#7d85ad", fontSize: 10 }}>
         <span>💬 {d.choices?.length ?? 0} 选择</span>
         {d.agent ? (
@@ -106,6 +115,7 @@ export default function IdeCanvas({
   onConnect,
   onNodeClick,
   onPaneClick,
+  onOpenCanvas,
 }: {
   nodes: Node<IdeNode>[];
   edges: IdeEdge[];
@@ -114,7 +124,10 @@ export default function IdeCanvas({
   onConnect?: (c: Connection) => void;
   onNodeClick?: (id: string) => void;
   onPaneClick?: () => void;
+  onOpenCanvas?: (id: string) => void;
 }) {
+  const nodeUi = useMemo(() => ({ onOpenCanvas }), [onOpenCanvas]);
+
   const flowEdges = useMemo<Edge[]>(
     () =>
       edges.map((e) => ({
@@ -130,6 +143,7 @@ export default function IdeCanvas({
   );
 
   return (
+    <NodeUiCtx.Provider value={nodeUi}>
     <ReactFlow
       nodes={nodes}
       edges={flowEdges}
@@ -146,5 +160,6 @@ export default function IdeCanvas({
       <Controls />
       <MiniMap pannable zoomable nodeColor={(n) => KIND_COLOR[(n.data as IdeNode).kind] ?? "#64748b"} maskColor="rgba(16,19,34,.7)" />
     </ReactFlow>
+    </NodeUiCtx.Provider>
   );
 }
