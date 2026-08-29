@@ -28,7 +28,8 @@ class ImageGenInput(BaseModel):
 
 class VideoGenInput(BaseModel):
     prompt: str
-    ref_image: str | None = None
+    ref_image: str | None = None            # 首帧图
+    ref_image_last: str | None = None       # 尾帧图(与 ref_image 一起时走首尾帧)
     duration_seconds: int = 5
     aspect_ratio: str = "16:9"
 
@@ -62,6 +63,7 @@ async def submit_project_video(
     task = await submit_video(VideoRequest(
         prompt=payload.prompt,
         ref_image=payload.ref_image,
+        ref_image_last=payload.ref_image_last,
         duration_seconds=payload.duration_seconds,
         aspect_ratio=payload.aspect_ratio,
     ))

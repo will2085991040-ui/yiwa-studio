@@ -134,6 +134,8 @@ async def _submit_minimax(cfg, request):
     content = [{'type': 'text', 'text': request.prompt}]
     if request.ref_image:
         content.append({'type': 'image_url', 'image_url': {'url': request.ref_image}, 'role': 'first_frame'})
+    if request.ref_image_last:
+        content.append({'type': 'image_url', 'image_url': {'url': request.ref_image_last}, 'role': 'last_frame'})
     payload = {'model': cfg['model'] or 'minimax-video-h3', 'content': content,
                'resolution': '768P', 'duration': max(1, min(int(request.duration_seconds or 5), 10))}
     if request.aspect_ratio in ("16:9", "9:16", "4:3", "3:4"):

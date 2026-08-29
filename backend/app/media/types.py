@@ -24,7 +24,8 @@ class ImageResult(BaseModel):
 
 class VideoRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
-    ref_image: str | None = None
+    ref_image: str | None = None            # 首帧图（image_url, role=first_frame）
+    ref_image_last: str | None = None       # 尾帧图（image_url, role=last_frame）；仅走 minimax 首尾帧
     duration_seconds: int = 5
     aspect_ratio: str = "16:9"
 
