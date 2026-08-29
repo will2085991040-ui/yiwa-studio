@@ -135,7 +135,9 @@ async def _submit_seedance(cfg, request):
 async def _submit_minimax(cfg, request):
     # tokenhub 网关视频: POST {base}/wand/minimax-video-v2/generation
     url = cfg['base_url'] + '/wand/minimax-video-v2/generation'
-    content = [{'type': 'text', 'text': request.prompt}]
+    from app.media.styles import decorate
+    _txt, _ = decorate(request.prompt, request.style)
+    content = [{'type': 'text', 'text': _txt}]
     if request.ref_image:
         content.append({'type': 'image_url', 'image_url': {'url': request.ref_image}, 'role': 'first_frame'})
     if request.ref_image_last:
@@ -159,7 +161,9 @@ async def _submit_minimax(cfg, request):
 async def _submit_metaso(cfg, request):
     # 秘塔/MiniMax 视频: POST {base}/api/minimax/v2/video_generation（已实测 key 有效返回 task_id）
     url = cfg['base_url'] + '/api/minimax/v2/video_generation'
-    content = [{'type': 'text', 'text': request.prompt}]
+    from app.media.styles import decorate
+    _txt, _ = decorate(request.prompt, request.style)
+    content = [{'type': 'text', 'text': _txt}]
     if request.ref_image:
         content.append({'type': 'image_url', 'image_url': {'url': request.ref_image}, 'role': 'first_frame'})
     if request.ref_image_last:

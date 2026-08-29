@@ -24,14 +24,22 @@ class ImageGenInput(BaseModel):
     size: str = ""
     n: int = 1
     ref_image: str | None = None
+    style: str = ""        # 风格 key
+
+
+@router.get("/styles")
+def list_styles() -> dict:
+    from app.media.styles import style_catalog
+    return {"styles": style_catalog()}
 
 
 class VideoGenInput(BaseModel):
     prompt: str
     ref_image: str | None = None            # 首帧图
-    ref_image_last: str | None = None       # 尾帧图(与 ref_image 一起时走首尾帧)
+    ref_image_last: str | None = None       # 尾帧图(与 ref_image 一起时首尾帧)
     duration_seconds: int = 5
     aspect_ratio: str = "16:9"
+    style: str = ""        # 画面风格 key
 
 
 def _require_project(session: Session, project_id: str) -> None:
@@ -50,6 +58,7 @@ async def generate_project_image(
         size=payload.size or "1024x1024",
         n=max(1, payload.n),
         ref_image=payload.ref_image,
+        style=payload.style,
     ))
     return result.model_dump()
 
@@ -66,6 +75,7 @@ async def submit_project_video(
         ref_image_last=payload.ref_image_last,
         duration_seconds=payload.duration_seconds,
         aspect_ratio=payload.aspect_ratio,
+        style=payload.style,
     ))
     return task.model_dump()
 

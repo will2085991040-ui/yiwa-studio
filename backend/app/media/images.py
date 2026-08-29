@@ -40,6 +40,11 @@ def _effective() -> dict[str, Any]:
 
 
 async def generate_image(request: ImageRequest) -> ImageResult:
+    # 画面风格：把风格 key 翻译成模型可用的 prompt 增强词/负面词，再交给下游。
+    from app.media.styles import decorate
+    req_prompt, req_neg = decorate(request.prompt, request.style, request.negative_prompt)
+    request.negative_prompt = req_neg
+    request.prompt = req_prompt
     cfg = _effective()
     if cfg["provider"] == "mock" or not cfg["api_key"] or not cfg["model"]:
         return ImageResult(provider="mock", model=cfg["model"], urls=[_MOCK_SVG], b64=[])

@@ -12,6 +12,7 @@ class ImageRequest(BaseModel):
     size: str = "1024x1024"
     n: int = 1
     ref_image: str | None = None  # 图生图参考图（URL 或 data URI）
+    style: str = ""              # 风格 key（见 app/media/styles.py）；空=默认不增强
 
 
 class ImageResult(BaseModel):
@@ -28,6 +29,7 @@ class VideoRequest(BaseModel):
     ref_image_last: str | None = None       # 尾帧图（image_url, role=last_frame）；仅走 minimax 首尾帧
     duration_seconds: int = 5
     aspect_ratio: str = "16:9"
+    style: str = ""  # 画面风格（影响首帧/文本画面描述）
 
 
 class VideoTask(BaseModel):
