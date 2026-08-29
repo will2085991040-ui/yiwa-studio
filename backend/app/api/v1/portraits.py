@@ -15,12 +15,14 @@ from app.models import Artifact, Project
 from app.schemas.character_card import CharacterCard
 from app.schemas.portrait import (
     CharacterPortrait,
+    PortraitVariant,
     compose_base_prompt,
     compose_variant_prompt,
     portrait_template,
     promote_variant,
 )
 from app.services.artifacts import latest_artifact, persist_versioned_artifact
+from app.services.portrait_ref import resolve_portrait_image
 
 router = APIRouter(prefix="/api")
 
@@ -418,3 +420,62 @@ def preview_prompt(
     """不落库地合成基础/差分提示词，供画布即时预览。"""
     _require_project(session, project_id)
     return _view(payload.portrait, 0)
+
+
+
+class PortraitGenerateInput(BaseModel):
+    style: str = "anime"   # 画面风格 key（app/media/styles.py）
+    aspect: str = "9:16"
+    force: bool = False
+
+
+@router.post("/projects/{project_id}/characters/{character_id}/portrait/generate")
+async def generate_base_portrait(project_id: str, character_id: str, payload: PortraitGenerateInput,
+                                 session: Session = Depends(get_session)) -> dict:
+    """One-click: read character card, merge 8-section appearance, compose base prompt, generate, and save."""
+
+    _require_project(session, project_id)
+    card = _find_character_card(session, project_id, character_id)
+    portrait, _version = _load(session, project_id, character_id)
+    if card is not None:
+        text = (card.content or {}).get("appearance") or (card.content or {}).get("description") or ""
+        text = str(text).strip()
+        app9 = dict(portrait.appearance or {})
+        if text:
+            existing = (app9.get("basic") or "").strip()
+            app9["basic"] = (existing + "，" + text) if existing else text
+        if not portrait.name and (card.content or {}).get("name"):
+            portrait = portrait.model_copy(update={"name": (card.content or {}).get("name")})
+        portrait = portrait.model_copy(update={"appearance": app9})
+    portrait = portrait.model_copy(update={"style": payload.style or portrait.style,
+                                             "aspect": payload.aspect or portrait.aspect})
+    prompt = compose_base_prompt(portrait)
+    result = await generate_image(ImageRequest(prompt=prompt, size=_aspect_size(portrait.aspect),
+        style=payload.style))
+    url = result.urls[0] if result.urls else (result.b64[0] if result.b64 else "")
+    if not url:
+        raise AppError("生成立绘未返回图片", code="no_image", status=400)
+    base_var = PortraitVariant(
+        variant_id="base", name="基础立绘", category="base", value="基础立绘",
+        description="一键生成的基础立绘", style=portrait.style, aspect=portrait.aspect,
+        image={"source": "generated", "url": url,
+        "provider": result.provider, "model": result.model},
+        status="saved", source="generated",
+    )
+    variants = [v for v in portrait.variants if v.variant_id != "base"] + [base_var]
+    updated = portrait.model_copy(update={"variants": variants, "base_variant_id": "base"})
+    artifact = persist_versioned_artifact(
+        session, project_id=project_id, task_id=_TASK, agent=_AGENT, kind=_kind(character_id),
+        content=updated.model_dump(), prompt_version="", source="generated", change_reason="一键生成立绘",
+    )
+    session.commit()
+    return {"portrait": _view(CharacterPortrait.model_validate(artifact.content), artifact.version),
+        "image_url": url, "prompt": prompt}
+
+
+@router.get("/projects/{project_id}/characters/{character_id}/portrait/video_ref")
+def portrait_video_ref(project_id: str, character_id: str, session: Session = Depends(get_session)) -> dict:
+    """返回该角色已保存立绘图 URL，作为图生视频首帧（保证人物一致）。"""
+    _require_project(session, project_id)
+    url = resolve_portrait_image(session, project_id, character_id)
+    return {"character_id": character_id, "ref_image": url, "has_portrait": bool(url)}

@@ -14,6 +14,7 @@ from app.media.images import generate_image
 from app.media.types import ImageRequest, VideoRequest
 from app.media.video import poll_video, submit_video
 from app.models import Project
+from app.services.portrait_ref import resolve_portrait_image
 
 router = APIRouter(prefix="/api")
 
@@ -40,6 +41,7 @@ class VideoGenInput(BaseModel):
     duration_seconds: int = 5
     aspect_ratio: str = "16:9"
     style: str = ""        # 画面风格 key
+    character_id: str | None = None   # 传了则：未给 ref_image 时自动以该角色立绘当首帧（人物一致）
 
 
 def _require_project(session: Session, project_id: str) -> None:
@@ -69,9 +71,12 @@ async def submit_project_video(
 ) -> dict:
     """提交生视频任务，返回 task_id 供前端轮询。"""
     _require_project(session, project_id)
+    ref_image = payload.ref_image
+    if not ref_image and payload.character_id:
+        ref_image = resolve_portrait_image(session, project_id, payload.character_id) or None
     task = await submit_video(VideoRequest(
         prompt=payload.prompt,
-        ref_image=payload.ref_image,
+        ref_image=ref_image,
         ref_image_last=payload.ref_image_last,
         duration_seconds=payload.duration_seconds,
         aspect_ratio=payload.aspect_ratio,
