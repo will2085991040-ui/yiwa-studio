@@ -2,8 +2,11 @@
 
 保存后关键值由启动器在下次启动时注入环境变量（重启生效）；本接口只负责安全的读写。
 """
+import asyncio
 import os
+from datetime import UTC, datetime
 
+import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -120,3 +123,82 @@ def update_settings(payload: SettingsUpdate) -> dict:
     merged = DesktopConfig.from_dict(current)
     save_config(merged, _config_path())
     return get_settings()
+
+
+
+async def _probe_text(cfg: dict) -> dict:
+    base = (cfg.get("llm_base_url") or "").rstrip("/")
+    key = cfg.get("llm_api_key") or ""
+    if not (_usable_url(base) and _usable_key(key)):
+        return {"channel": "text", "ok": False, "status": None, "note": "未配置 LLM 端点/密钥"}
+    model = (cfg.get("llm_model") or "deepseek-v4-flash-0731")
+    payload = {"model": model, "messages": [{"role": "user", "content": "ping"}], "max_tokens": 8, "stream": False}
+    try:
+        async with httpx.AsyncClient(timeout=12) as c:
+            r = await c.post(base + "/chat/completions", json=payload,
+                             headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+        ok = r.status_code < 400
+        note = "" if ok else r.text[:160]
+        return {"channel": "text", "provider": cfg.get("llm_provider"), "model": model,
+                "base": base, "ok": ok, "status": r.status_code, "note": note}
+    except httpx.HTTPError as e:
+        return {"channel": "text", "ok": False, "status": None, "note": "请求异常: " + repr(e)[:140]}
+
+
+async def _probe_video(cfg: dict) -> dict:
+    provider = cfg.get("video_provider") or "mock"
+    base = (cfg.get("video_base_url") or "").rstrip("/")
+    key = cfg.get("video_api_key") or cfg.get("llm_api_key") or ""
+    model = cfg.get("video_model") or "minimax-video-h3"
+    if provider in ("mock",) or not (_usable_url(base) and _usable_key(key)):
+        return {"channel": "video", "provider": provider, "ok": False, "status": None,
+                "note": ("默认 mock，未实际探测" if provider == "mock" else "未配置 video_api_key 或端点")}
+    if provider == "metaso_minimax":
+        url = base + "/api/minimax/v2/video_generation"
+        reso = "2K"
+    elif provider == "minimax":
+        url = base + "/wand/minimax-video-v2/generation"
+        reso = "768P"
+    elif provider == "seedance":
+        url = base + "/contents/generations/tasks"
+        reso = "720p"
+    else:
+        return {"channel": "video", "provider": provider, "ok": False, "status": None,
+                "note": "暂不支持探测 provider=" + str(provider)}
+    content = [{"type": "text", "text": "ping"}]
+    payload = {"model": model, "content": content, "resolution": reso, "duration": 5}
+    if provider == "seedance":
+        payload = {"model": model, "content": content, "resolution": reso, "duration": 5}
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(url, json=payload,
+                             headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+        ok = r.status_code < 400
+        tid = ""
+        note = ""
+        if ok:
+            try:
+                d = r.json()
+                tid = d.get("task_id") or d.get("id") or (d.get("data") or {}).get("task_id") or ""
+                note = "已生成任务 task_id=" + str(tid) if tid else "已接受(200)"
+            except Exception:
+                note = "已接受(200)"
+        else:
+            note = r.text[:160]
+        return {"channel": "video", "provider": provider, "model": model, "base": base,
+                "ok": ok, "status": r.status_code, "task_id": str(tid), "note": note}
+    except httpx.HTTPError as e:
+        return {"channel": "video", "ok": False, "status": None, "note": "请求异常: " + str(e)[:140]}
+
+
+@router.get("/settings/connectivity")
+async def settings_connectivity() -> dict:
+    cfg = _effective()
+    t, v = await asyncio.gather(_probe_text(cfg), _probe_video(cfg))
+    results = [t, v]
+    return {
+        "probe_at": datetime.now(UTC).isoformat(timespec="seconds") + "Z",
+        "results": results,
+        "all_ok": all(r["ok"] for r in results),
+        "hint": "status 为各通道实测 HTTP 状态码；视频若返回 4xx/未开通计费，请核对 video_base_url / video_api_key / video_query_path",
+    }
