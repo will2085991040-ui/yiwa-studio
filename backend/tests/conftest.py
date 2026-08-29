@@ -5,6 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import os
+
+# 测试套件强制离线：LLM 走 mock（真实生产默认已是 tokenhub openai_compat，这里不改它）
+os.environ.setdefault("LLM_PROVIDER", "mock")
+
 from app.db.base import Base, get_session
 from app.main import app
 from app.models import (  # noqa: F401

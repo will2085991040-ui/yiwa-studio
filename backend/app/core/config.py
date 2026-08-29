@@ -18,10 +18,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./dev.db"
 
     # LLM（OpenAI 兼容层）：LLM_PROVIDER=mock 时完全离线
-    llm_provider: str = "mock"  # mock | openai_compat
-    llm_base_url: str = "https://api.deepseek.com"
+    llm_provider: str = "openai_compat"  # mock | openai_compat（接 tokenhub 网关默认已指向生成剧本模型）
+    llm_base_url: str = "https://tokenhub.tencentmaas.com/v1"
     llm_api_key: str = ""
-    llm_model: str = "deepseek-chat"
+    llm_model: str = "deepseek-v4-flash-0731"    # 剧本生成模型（tokenhub 网关实际模型名）
     # 专用剧本生成模型：留空则复用 llm_model。接火山方舟等自定义端点时填 ep-xxxx 形态的模型名。
     llm_script_model: str = ""
     llm_temperature: float = 0.7
@@ -43,9 +43,9 @@ class Settings(BaseSettings):
 
     # 生视频（即梦/火山方舟 Seedance 内容生成任务）
     video_provider: str = "mock"                    # mock | seedance | minimax(tokenhub)
-    video_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+    video_base_url: str = "https://tokenhub.tencentmaas.com/v1"
     video_api_key: str = ""
-    video_model: str = "doubao-seedance-1-0-pro-250528"
+    video_model: str = "minimax-video-h3"    # tokenhub 视频模型（需在控制台开通后付费计费）
     video_poll_interval: float = 3.0
     video_max_polls: int = 120
 
