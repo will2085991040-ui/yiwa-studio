@@ -6,7 +6,6 @@
     GET  https://dashscope.aliyuncs.com/api/v1/tasks/{id}
          -> {"output":{"task_id","task_status","video_url"|"results":[{url}],"message"}}
 - seedance : 火山方舟内容生成异步任务 POST {base}/contents/generations/tasks ; GET .../tasks/{id}
-- minimax   : tokenhub 网关视频(model=minimax-video-h3, 文生视频+首尾帧)
 - yiwa_gateway : YIWA 自研 /v1/videos/generations
 provider=mock 或未配置 key 时回退 mock。
 """
@@ -103,8 +102,6 @@ async def submit_video(request, resolution="720p"):
             return await _submit_yiwa(cfg, request)
         if provider == "seedance":
             return await _submit_seedance(cfg, request)
-        if provider == "minimax":
-            return await _submit_minimax(cfg, request)
     except MediaError:
         raise
     except Exception as exc:
@@ -127,27 +124,6 @@ async def _submit_seedance(cfg, request):
     if not task_id:
         raise MediaError("生视频提交未返回任务id:" + resp.text[:300])
     return VideoTask(provider="seedance", model=cfg["model"], task_id=str(task_id), status="queued")
-
-async def _submit_minimax(cfg, request):
-    # tokenhub 网关视频: POST {base}/wand/minimax-video-v2/generation
-    url = cfg['base_url'] + '/wand/minimax-video-v2/generation'
-    content = [{'type': 'text', 'text': request.prompt}]
-    if request.ref_image:
-        content.append({'type': 'image_url', 'image_url': {'url': request.ref_image}, 'role': 'first_frame'})
-    payload = {'model': cfg['model'] or 'minimax-video-h3', 'content': content,
-               'resolution': '768P', 'duration': max(1, min(int(request.duration_seconds or 5), 10))}
-    if request.aspect_ratio in ("16:9", "9:16", "4:3", "3:4"):
-        payload['ratio'] = request.aspect_ratio
-    async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:
-        resp = await client.post(url, json=payload, headers=_auth(cfg))
-    if resp.status_code >= 400:
-        raise MediaError('生视频提交错误(' + str(resp.status_code) + '):' + resp.text[:300])
-    data = _as_json(resp)
-    task_id = (data.get('task_id') or data.get('id')
-               or (data.get('data') or {}).get('task_id') or (data.get('data') or {}).get('id'))
-    if not task_id:
-        raise MediaError('生视频提交未返回任务id:' + resp.text[:300])
-    return VideoTask(provider='minimax', model=cfg['model'] or 'minimax-video-h3', task_id=str(task_id), status='queued')
 
 
 async def _submit_yiwa(cfg, request):
@@ -200,8 +176,6 @@ async def poll_video(task_id, task=None):
     try:
         if provider == "seedance":
             url = cfg["base_url"] + "/contents/generations/tasks/" + task_id
-        elif provider == "minimax":
-            url = cfg["base_url"] + "/wand/minimax-video-v2/tasks/" + task_id
         else:
             url = cfg["base_url"] + "/v1/videos/generations/" + task_id
         async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:

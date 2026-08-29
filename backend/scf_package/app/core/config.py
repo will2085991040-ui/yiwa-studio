@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     image_size: str = "1024x1024"
 
     # 生视频（即梦/火山方舟 Seedance 内容生成任务）
-    video_provider: str = "mock"                    # mock | seedance | minimax(tokenhub)
+    video_provider: str = "mock"                    # mock | seedance
     video_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
     video_api_key: str = ""
     video_model: str = "doubao-seedance-1-0-pro-250528"

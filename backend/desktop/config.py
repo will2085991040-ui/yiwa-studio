@@ -22,10 +22,10 @@ class DesktopConfig:
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
     open_browser: bool = True
-    llm_provider: str = "mock"              # mock | openai_compat
-    llm_base_url: str = "https://api.deepseek.com"
-    llm_api_key: str = ""                   # 用户自行填写，不硬编码
-    llm_model: str = "deepseek-chat"
+    llm_provider: str = "openai_compat"     # mock | openai_compat（接腾讯 tokenhub 混元已内置默认端点）
+    llm_base_url: str = "https://tokenhub.tencentmaas.com/v1"   # 网关端点（非用户网址），密钥仅露在 config.json
+    llm_api_key: str = ""                     # 用户自行填写（config.json），不硬编码不进二进制
+    llm_model: str = "hy-role"                # 腾讯混元角色模型（tokenhub 网关模型名）
     llm_script_model: str = ""        # 剧本专用模型（缺省复用 llm_model），如火山方舟 ep-xxxx
     llm_disable_thinking: bool = False     # True: 结构化生成关闭推理模型的 thinking（更快更省）
     llm_timeout_seconds: int = 180         # 单次 LLM 请求超时（秒）；长剧情/分镜输出放宽防“请求超时”
