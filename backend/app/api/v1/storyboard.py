@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, NotFoundError
 from app.db.base import get_session
-from app.media.types import VideoRequest
+from app.media.images import generate_image
+from app.media.types import ImageRequest, VideoRequest
 from app.media.video import poll_video, submit_video
-from app.models import Project
+from app.models import Artifact, Project
 from app.schemas.storyboard import (
     COST_PER_SECOND,
     Storyboard,
@@ -187,3 +188,72 @@ async def get_video(project_id: str, node_id: str, session: Session = Depends(ge
             )
             session.commit()
     return job.model_dump()
+
+
+class NodeImageInput(BaseModel):
+    prompt: str
+    style: str = ""
+    aspect: str = "9:16"
+    ref_image: str | None = None
+
+
+def _node_img_kind(node_id: str) -> str:
+    return "node_image:" + node_id
+
+
+def _node_aspect_size(aspect: str) -> str:
+    if aspect == "9:16":
+        return "768x1344"
+    if aspect == "16:9":
+        return "1344x768"
+    return "1024x1024"
+
+
+@router.post("/projects/{project_id}/nodes/{node_id}/images")
+async def create_node_image(
+    project_id: str, node_id: str, payload: NodeImageInput, session: Session = Depends(get_session),
+) -> dict:
+    """小画布：为指定剧情节点点生成画面（style），并持久化为节点资产。"""
+    _require_project(session, project_id)
+    result = await generate_image(ImageRequest(
+        prompt=payload.prompt, style=payload.style,
+        size=_node_aspect_size(payload.aspect), ref_image=payload.ref_image,
+    ))
+    url = result.urls[0] if result.urls else (result.b64[0] if result.b64 else "")
+    content = {
+        "node_id": node_id, "url": url, "provider": result.provider, "model": result.model,
+        "prompt": payload.prompt, "style": payload.style, "aspect": payload.aspect,
+        "ref_image": payload.ref_image,
+    }
+    persist_versioned_artifact(
+        session, project_id=project_id, task_id="node-image-" + node_id, agent=_AGENT,
+        kind=_node_img_kind(node_id), content=content, prompt_version="", source="generated",
+        change_reason="canvas-node-image",
+    )
+    session.commit()
+    return content
+
+
+@router.get("/projects/{project_id}/nodes/{node_id}/canvas")
+def get_node_canvas(project_id: str, node_id: str, session: Session = Depends(get_session)) -> dict:
+    """分节点小画布：该节点分镜 + 已生成图 + 视频 + 风格列表，一次性灌给前端。"""
+    _require_project(session, project_id)
+    sb, sb_ver = _load_storyboard(session, project_id, node_id)
+    rows = (
+        session.query(Artifact).filter(
+            Artifact.project_id == project_id, Artifact.kind == _node_img_kind(node_id),
+        ).order_by(Artifact.created_at.desc()).all()
+    )
+    images = [
+        {k: (a.content or {}).get(k) for k in ("url", "prompt", "style", "aspect")}
+        for a in rows
+    ]
+    video = latest_artifact(session, project_id, kind=_vj_kind(node_id))
+    from app.media.styles import style_catalog
+    return {
+        "node_id": node_id,
+        "storyboard": _sb_view(sb, sb_ver),
+        "images": images,
+        "video": (VideoJob.model_validate(video.content).model_dump() if video and video.content else None),
+        "styles": style_catalog(),
+    }
