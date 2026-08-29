@@ -39,11 +39,13 @@ def _effective():
     if settings.yiwa_token and settings.yiwa_gateway_url:
         return {"provider": "yiwa_gateway", "base_url": settings.yiwa_gateway_url.rstrip("/"),
                 "api_key": settings.yiwa_token, "model": settings.video_model,
+                "query_path": settings.video_query_path,
                 "poll_interval": settings.video_poll_interval, "max_polls": settings.video_max_polls}
     return {"provider": settings.video_provider,
             "base_url": (settings.video_base_url or "").rstrip("/"),
             "api_key": settings.video_api_key or settings.llm_api_key,
             "model": settings.video_model,
+            "query_path": settings.video_query_path,
             "poll_interval": settings.video_poll_interval, "max_polls": settings.video_max_polls}
 
 
@@ -105,6 +107,8 @@ async def submit_video(request, resolution="720p"):
             return await _submit_seedance(cfg, request)
         if provider == "minimax":
             return await _submit_minimax(cfg, request)
+        if provider == "metaso_minimax":
+            return await _submit_metaso(cfg, request)
     except MediaError:
         raise
     except Exception as exc:
@@ -150,6 +154,30 @@ async def _submit_minimax(cfg, request):
     if not task_id:
         raise MediaError('生视频提交未返回任务id:' + resp.text[:300])
     return VideoTask(provider='minimax', model=cfg['model'] or 'minimax-video-h3', task_id=str(task_id), status='queued')
+
+
+async def _submit_metaso(cfg, request):
+    # 秘塔/MiniMax 视频: POST {base}/api/minimax/v2/video_generation（已实测 key 有效返回 task_id）
+    url = cfg['base_url'] + '/api/minimax/v2/video_generation'
+    content = [{'type': 'text', 'text': request.prompt}]
+    if request.ref_image:
+        content.append({'type': 'image_url', 'image_url': {'url': request.ref_image}, 'role': 'first_frame'})
+    if request.ref_image_last:
+        content.append({'type': 'image_url', 'image_url': {'url': request.ref_image_last}, 'role': 'last_frame'})
+    payload = {'model': cfg['model'] or 'MiniMax-H3', 'content': content,
+               'resolution': '2K', 'duration': max(1, min(int(request.duration_seconds or 5), 10))}
+    if request.aspect_ratio in ('16:9', '9:16', '4:3', '3:4'):
+        payload['ratio'] = request.aspect_ratio
+    async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:
+        resp = await client.post(url, json=payload, headers=_auth(cfg))
+    if resp.status_code >= 400:
+        raise MediaError('生视频提交错误(' + str(resp.status_code) + '):' + resp.text[:300])
+    data = _as_json(resp)
+    task_id = (data.get('task_id') or data.get('id') or (data.get('data') or {}).get('task_id')
+               or (data.get('data') or {}).get('id'))
+    if not task_id:
+        raise MediaError('生视频提交未返回任务id:' + resp.text[:300])
+    return VideoTask(provider='metaso_minimax', model=cfg['model'] or 'MiniMax-H3', task_id=str(task_id), status='queued')
 
 
 async def _submit_yiwa(cfg, request):
@@ -204,6 +232,10 @@ async def poll_video(task_id, task=None):
             url = cfg["base_url"] + "/contents/generations/tasks/" + task_id
         elif provider == "minimax":
             url = cfg["base_url"] + "/wand/minimax-video-v2/tasks/" + task_id
+        elif provider == "metaso_minimax":
+            # 秘塔查询端点以 query_path 为准（{task} 占位）；提交侧已实测 200+task_id
+            qp = cfg.get("query_path") or "/api/minimax/v2/video_generation/{task}"
+            url = cfg["base_url"] + qp.replace("{task}", task_id)
         else:
             url = cfg["base_url"] + "/v1/videos/generations/" + task_id
         async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:

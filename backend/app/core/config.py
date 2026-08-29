@@ -42,10 +42,12 @@ class Settings(BaseSettings):
     image_size: str = "1024x1024"
 
     # 生视频（即梦/火山方舟 Seedance 内容生成任务）
-    video_provider: str = "mock"                    # mock | seedance | minimax(tokenhub)
+    video_provider: str = "mock"                    # mock | seedance | minimax(tokenhub) | metaso_minimax(秘塔/MiniMax)
     video_base_url: str = "https://tokenhub.tencentmaas.com/v1"
     video_api_key: str = ""
-    video_model: str = "minimax-video-h3"    # tokenhub 视频模型（需在控制台开通后付费计费）
+    video_model: str = "minimax-video-h3"    # tokenhub 视频模型（需开通后付费计费）
+    # 秘塔/MiniMax 视频查询端点模板（{task} 为占位）：提交成功也会 task_id，轮询按该路径查状态。
+    video_query_path: str = "/api/minimax/v2/video_generation/{task}"
     video_poll_interval: float = 3.0
     video_max_polls: int = 120
 
