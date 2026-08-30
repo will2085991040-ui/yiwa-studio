@@ -8,6 +8,7 @@ import {
   createNodeImage,
   generateStoryboardVideo,
   getNodeCanvas,
+  storyboardBreakdown,
   type NodeCanvasOut,
 } from "@/lib/api";
 
@@ -71,9 +72,15 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
     setVideoBusy(true);
     setVideoMsg("");
     setErr("");
+    const hasShots = ((data?.storyboard as { shots?: unknown[] } | undefined)?.shots?.length ?? 0) > 0;
     try {
+      if (!hasShots) {
+        setVideoMsg("自动拆镜中…");
+        await storyboardBreakdown(projectId, nodeId, 4);
+        setVideoMsg("拆镜完成，正在用这张图生成视频…");
+      }
       await generateStoryboardVideo(projectId, nodeId, { aspect_ratio: aspect, ref_image: refImage, style });
-      setVideoMsg("视频任务已提交；请稍后在下方「视频任务」刷新查看结果。");
+      setVideoMsg("视频任务已提交（首帧已锁定，人物/画面一致）。请刷新查看结果。");
       await load();
     } catch (e) {
       setErr(String((e as Error).message ?? e));
@@ -101,6 +108,10 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
             <div className="text-sm font-bold">{nodeTitle} <span className="text-slate-500">({nodeId})</span></div>
           </div>
           <button onClick={onClose} className="rounded-lg border border-white/10 bg-panel2 px-2.5 py-1.5 text-xs hover:bg-white/5">✕ 关闭</button>
+        </div>
+
+        <div className="border-b border-white/5 bg-white/[0.02] px-4 py-1.5 text-[11px] leading-relaxed text-slate-400">
+          制作流程：选风格 → 填画面 → 🎨 生成画面 → 点每张图「🎬 用此图做视频」自动以它为<span  className="text-accent">首帧</span>（人物/画面一致）→ 无分镜时<span className="text-accent">自动拆镜</span> → 刷新区查看视频。
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
