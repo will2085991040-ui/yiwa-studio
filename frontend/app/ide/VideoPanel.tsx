@@ -50,6 +50,8 @@ export default function VideoPanel({
   const [sb, setSb] = useState<Storyboard | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [aspect, setAspect] = useState("16:9");
+  const [style, setStyle] = useState("");   // 画面渲染风格：二次元/真人/动态漫画…
+  const [styles, setStyles] = useState<{ id: string; label: string }[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -95,6 +97,7 @@ export default function VideoPanel({
 
   useEffect(() => {
     authenticatedFetch("/api/meta/storyboard-template").then((r) => r.json()).then(setTemplate).catch(() => {});
+    authenticatedFetch("/api/styles").then((r) => r.json()).then((d) => setStyles((d?.styles ?? []) as { id: string; label: string }[])).catch(() => {});
   }, []);
 
   const loadAll = useCallback(() => {
@@ -175,7 +178,7 @@ export default function VideoPanel({
     setBusy(true);
     setMsg(null);
     try {
-      const j = (await generateStoryboardVideo(projectId, nodeId, { aspect_ratio: aspect })) as unknown as Job;
+      const j = (await generateStoryboardVideo(projectId, nodeId, { aspect_ratio: aspect, style })) as unknown as Job;
       setJob(j);
       setMsg({ ok: true, text: `视频任务${(j.status === "done") ? "完成" : "已提交"}：${j.total_cost} 积分 / ${j.duration_sec}s · ${j.aspect_ratio === "9:16" ? "竖屏" : "横屏"}` });
     } catch (e) {
@@ -196,6 +199,17 @@ export default function VideoPanel({
         <span className="ml-auto text-xs text-slate-400">{sb ? `v·${sb.shots.length} 镜头 · ${totalSec}s · ≈${Math.round(totalSec * (template.cost_per_second ?? 10))} 积分` : ""}</span>
         <button onClick={doBreakdown} disabled={busy} className="rounded-lg bg-violet-600/80 px-3 py-1 text-xs font-semibold hover:bg-violet-500 disabled:opacity-50">整列拆镜</button>
         <button onClick={saveShots} disabled={!sb} className="rounded-lg border border-white/10 bg-panel2 px-3 py-1 text-xs hover:bg-white/5">保存镜表</button>
+        <label className="flex items-center gap-1 text-xs">
+          风格
+          <select
+            value={style}
+            onChange={(e) => setStyle(e.target.value)}
+            title="画面渲染风格：二次元 / 真人写实 / 动态漫画 / 史诗电影感…" className="rounded-lg bg-panel2 border border-white/10 px-1.5 py-1 text-xs"
+          >
+            <option value="">默认</option>
+            {styles.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </label>
         <label className="flex items-center gap-1 text-xs">
           画面
           <select value={aspect} onChange={(e) => setAspect(e.target.value)} className="rounded-lg bg-panel2 border border-white/10 px-1.5 py-1 text-xs">
