@@ -89,6 +89,28 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
     }
   };
 
+  const oneShot = async () => {
+    if (busy || videoBusy) return;
+    setErr("");
+    const usePrompt =
+      prompt.trim() ||
+      (((data?.storyboard as { synopsis?: string } | undefined)?.synopsis)?.slice(0, 80)) ||
+      "该剧情节点的关键画面";
+    setBusy(true);
+    setVideoMsg("一键成片：先文生图，再锁定它做首帧生成视频…");
+    try {
+      const img = await createNodeImage(projectId, nodeId, { prompt: usePrompt, style, aspect });
+      setPrompt(usePrompt);
+      await load();
+      setBusy(false);
+      await makeVideo(img?.url || "");
+    } catch (e) {
+      setErr(String((e as Error).message ?? e));
+      setBusy(false);
+      setVideoMsg("");
+    }
+  };
+
   if (!open) return null;
 
   const styles = data?.styles ?? [];
@@ -161,13 +183,23 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
                   placeholder="描述这一节点该出什么画面，如：背对镜头的少女站在雨中的霓虹街头…"
                   className="mt-2 h-16 w-full resize-none rounded-lg border border-white/10 bg-panel2 px-3 py-2 text-xs outline-none focus:border-accent/60"
                 />
-                <button
-                  onClick={generate}
-                  disabled={busy || !prompt.trim()}
-                  className="mt-2 rounded-lg bg-accent/20 px-3 py-1.5 text-xs font-bold text-accent hover:bg-accent/30 disabled:opacity-40"
-                >
-                  {busy ? "● 生成中…" : "🎨 为该节点生成画面"}
-                </button>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    onClick={generate}
+                    disabled={busy || !prompt.trim()}
+                    className="rounded-lg bg-accent/20 px-3 py-1.5 text-xs font-bold text-accent hover:bg-accent/30 disabled:opacity-40"
+                  >
+                    {busy ? "● 生成中…" : "🎨 为该节点生成画面"}
+                  </button>
+                  <button
+                    onClick={() => { void oneShot(); }}
+                    disabled={busy || videoBusy}
+                    className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-40"
+                    title="一键：文生图 → 锁定首帧 → 自动拆镜 → 生成视频"
+                  >
+                    {videoBusy || busy ? "● 制作中…" : "⚡ 一键成片"}
+                  </button>
+                </div>
               </section>
 
               <section>
