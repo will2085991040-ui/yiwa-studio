@@ -385,14 +385,22 @@ export function deleteCharacter(projectId: string, characterId: string) {
 export function generateStoryboardVideo(
   projectId: string,
   nodeId: string,
-  opts: { duration_sec?: number; aspect_ratio?: string },
+  opts: { duration_sec?: number; aspect_ratio?: string; ref_image?: string; style?: string },
 ) {
   return aiBusy(
     "AI 生成分镜视频",
     `${nodeId} · 拆镜/运镜/台词合成中…`,
     req<Record<string, unknown>>(
       `/api/projects/${projectId}/storyboard/${nodeId}/video`,
-      { method: "POST", body: JSON.stringify({ duration_sec: opts.duration_sec ?? null, aspect_ratio: opts.aspect_ratio ?? "16:9" }) },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          duration_sec: opts.duration_sec ?? null,
+          aspect_ratio: opts.aspect_ratio ?? "16:9",
+          ref_image: opts.ref_image ?? null,
+          style: opts.style ?? "",
+        }),
+      },
     ),
   );
 }

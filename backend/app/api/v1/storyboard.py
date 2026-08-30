@@ -70,6 +70,8 @@ class SaveInput(BaseModel):
 class VideoGenInput(BaseModel):
     duration_sec: float | None = None
     aspect_ratio: str = "16:9"  # 16:9 横屏 / 9:16 竖屏
+    ref_image: str | None = None   # 首帧图（可用小画布刚生成的图保证人物一致）
+    style: str = ""               # 画面风格 key
 
 
 @router.get("/meta/storyboard-template")
@@ -126,11 +128,11 @@ async def create_video(
         )
     duration = payload.duration_sec if payload.duration_sec is not None else sum(s.duration_sec for s in sb.shots)
     identity = (sb.metadata or {}).get("character_identity") or ""
-    ref_image = (sb.metadata or {}).get("character_ref_image") or None
+    ref_image = (sb.metadata or {}).get("character_ref_image") or payload.ref_image or None
     prompt = compose_seedance_prompt(sb, character_identity=identity)
     task = await submit_video(
         VideoRequest(prompt=prompt, duration_seconds=int(round(duration)), aspect_ratio=aspect,
-                     ref_image=ref_image)
+                     ref_image=ref_image, style=payload.style or "")
     )
 
     status: str = "queued"

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   createNodeImage,
+  generateStoryboardVideo,
   getNodeCanvas,
   type NodeCanvasOut,
 } from "@/lib/api";
@@ -27,6 +28,8 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("");
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("9:16");
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoMsg, setVideoMsg] = useState("");
 
   const load = useCallback(async () => {
     if (!open || !projectId || !nodeId) return;
@@ -60,6 +63,22 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
       setErr(String((e as Error).message ?? e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const makeVideo = async (refImage: string) => {
+    if (videoBusy) return;
+    setVideoBusy(true);
+    setVideoMsg("");
+    setErr("");
+    try {
+      await generateStoryboardVideo(projectId, nodeId, { aspect_ratio: aspect, ref_image: refImage, style });
+      setVideoMsg("视频任务已提交；请稍后在下方「视频任务」刷新查看结果。");
+      await load();
+    } catch (e) {
+      setErr(String((e as Error).message ?? e));
+    } finally {
+      setVideoBusy(false);
     }
   };
 
@@ -150,6 +169,12 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
                       <div key={i} className="overflow-hidden rounded-lg border border-white/10">
                         <img src={im.url} alt={im.prompt} className="aspect-[9/16] w-full object-cover" />
                         <div className="px-1.5 py-1 text-[9px] text-slate-400">{im.style || "默认"} · {im.aspect || "9:16"}</div>
+                        <button
+                          onClick={() => { void makeVideo(im.url); }}
+                          disabled={videoBusy}
+                          className="block w-full border-t border-white/10 bg-accent/15 py-1 text-center text-[10px] font-bold text-accent hover:bg-accent/25 disabled:opacity-40"
+                          title="用这张图作为首帧，为该节点生成视频（保证人物/画面一致）"
+                        >{videoBusy ? "● 生成中…" : "🎬 用此图做视频"}</button>
                       </div>
                     ))}
                   </div>
@@ -157,7 +182,16 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
               </section>
 
               <section>
-                <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">视频任务</div>
+                <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  视频任务
+                  <button onClick={() => { void load(); }} className="rounded border border-white/10 bg-panel2 px-1.5 py-0.5 text-[10px] font-normal normal-case text-slate-300 hover:bg-white/5">⟳ 刷新</button>
+                </div>
+                {videoMsg && !videoBusy && (
+                  <div className="mb-1 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] text-accent">{videoMsg}</div>
+                )}
+                {videoBusy && (
+                  <div className="mb-1 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] text-accent">视频生成中…（可在主画布「分镜视频」跟进）</div>
+                )}
                 {video ? (
                   <div className="flex items-center gap-2 text-[11px] text-slate-300">
                     <span className={`rounded px-1.5 py-0.5 text-[10px] ${video.status === "done" ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
