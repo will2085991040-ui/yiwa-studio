@@ -165,6 +165,14 @@ export default function IdePage() {
               <button onClick={() => setVideoMode((v) => !v)} className={`rounded-lg border px-2 py-1 text-xs ${videoMode ? "border-accent bg-accent/15 text-accent" : "border-white/10 bg-panel2 hover:bg-white/5"}`}>
                 🎬 分镜视频
               </button>
+              <button
+                onClick={() => selectedId && setCanvasNode(selectedId)}
+                disabled={!selectedId}
+                title={selectedId ? `为「${selected?.data.title ?? selectedId}」打开节点小画布` : "先在画布上选中一个剧情节点"}
+                className={`rounded-lg border px-2 py-1 text-xs ${selectedId ? "border-purple-400/50 bg-purple-500/15 text-purple-200 hover:bg-purple-500/25" : "border-white/10 bg-panel2 text-slate-500 opacity-60"}`}
+              >
+                🎨 小画布{selectedId ? "" : "（先选节点）"}
+              </button>
               <button onClick={() => ide.addNode("scene")} className="rounded-lg border border-white/10 bg-panel2 px-2 py-1 text-xs hover:bg-white/5">
                 + 剧情
               </button>
