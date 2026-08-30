@@ -30,7 +30,7 @@ import {
 export type { IdeEdge, IdeNode };
 export { KIND_COLOR, KIND_LABEL } from "./workspace";
 
-const NodeUiCtx = createContext<{ onOpenCanvas?: (id: string) => void }>({});
+const NodeUiCtx = createContext<{ onOpenCanvas?: (id: string) => void; thumbs?: Record<string, string> }>({});
 
 type Badge = { label: string; border: string; bg: string; color: string };
 
@@ -52,7 +52,8 @@ function NodeCard({ data }: NodeProps) {
   const d = data as unknown as IdeNode & { isEntry?: boolean };
   const color = KIND_COLOR[d.kind] ?? "#64748b";
   const st = statusBadge(d.status, d.generating);
-  const { onOpenCanvas } = useContext(NodeUiCtx);
+  const { onOpenCanvas, thumbs } = useContext(NodeUiCtx);
+  const thumb = thumbs?.[d.node_id];
   return (
     <div
       style={{
@@ -83,6 +84,16 @@ function NodeCard({ data }: NodeProps) {
       <div style={{ fontWeight: 700, fontSize: 13, color: "#f4f2ff" }}>{d.title || d.node_id}</div>
       {d.summary ? (
         <div style={{ color: "#9ca3c8", marginTop: 2, lineHeight: 1.35, maxHeight: 52, overflow: "hidden" }}>{d.summary}</div>
+      ) : null}
+      {thumb ? (
+        <a
+          href="#canvas"
+          onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onOpenCanvas?.(d.node_id); }}
+          title="点开节点小画布查看/制作"
+          style={{ display: "block", height: 64, marginTop: 6, borderRadius: 8, overflow: "hidden", border: "1px solid rgba(255,255,255,.1)", background: "#0b0a1c", cursor: "pointer" }}
+        >
+          <img src={thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        </a>
       ) : null}
       {onOpenCanvas ? (
       <button
@@ -116,6 +127,7 @@ export default function IdeCanvas({
   onNodeClick,
   onPaneClick,
   onOpenCanvas,
+  thumbs,
 }: {
   nodes: Node<IdeNode>[];
   edges: IdeEdge[];
@@ -125,8 +137,9 @@ export default function IdeCanvas({
   onNodeClick?: (id: string) => void;
   onPaneClick?: () => void;
   onOpenCanvas?: (id: string) => void;
+  thumbs?: Record<string, string>;
 }) {
-  const nodeUi = useMemo(() => ({ onOpenCanvas }), [onOpenCanvas]);
+  const nodeUi = useMemo(() => ({ onOpenCanvas, thumbs }), [onOpenCanvas, thumbs]);
 
   const flowEdges = useMemo<Edge[]>(
     () =>

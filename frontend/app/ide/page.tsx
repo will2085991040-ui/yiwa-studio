@@ -12,7 +12,7 @@ import NodeCanvasModal from "./NodeCanvasModal";
 import Playthrough from "./Playthrough";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { KIND_COLOR, latestOf, WORKSPACES, type IdeEdge, type WorkspaceKey } from "./workspace";
-import { getOrchestration, orchestrateProject, storyOperation, sceneOperation, generateProjectBranchImage } from "@/lib/api";
+import { getNodeCanvas, getOrchestration, orchestrateProject, storyOperation, sceneOperation, generateProjectBranchImage } from "@/lib/api";
 import { appendAiProgress, clearAiProgress, setAiProgress } from "@/lib/aiProgress";
 
 const Canvas = dynamic(() => import("./Canvas"), {
@@ -30,6 +30,7 @@ export default function IdePage() {
   const [videoMode, setVideoMode] = useState(false);
   const [playOpen, setPlayOpen] = useState(false);
   const [canvasNode, setCanvasNode] = useState<string | null>(null);
+  const [nodeThumbs, setNodeThumbs] = useState<Record<string, string>>({});
   const [posters, setPosters] = useState<Record<string, string>>({}); // node_id -> 该共创分支的海报 image_url（真实验证）
   const [aiInstr, setAiInstr] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -55,6 +56,28 @@ export default function IdePage() {
   );
   const nodeIds = useMemo(() => ide.nodes.map((n) => n.id), [ide.nodes]);
   const latestArts = latestOf(ide.artifacts);
+
+  useEffect(() => {
+    if (!projectId || nodeIds.length === 0) return;
+    let gone = false;
+    void (async () => {
+      const next: Record<string, string> = {};
+      await Promise.all(
+        nodeIds.map(async (nid) => {
+          try {
+            const d = await getNodeCanvas(projectId, nid);
+            const u = d?.images?.[0]?.url;
+            if (u) next[nid] = u;
+          } catch {
+            /* 忽略该节点 */
+          }
+        }),
+      );
+      if (!gone && Object.keys(next).length) setNodeThumbs((prev) => ({ ...prev, ...next }));
+    })();
+    return () => { gone = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, nodeIds.join(",")]);
 
   const selected = ide.nodes.find((n) => n.id === selectedId);
   const selectedMeta = selectedId ? ide.nodeMeta[selectedId] : undefined;
@@ -229,6 +252,7 @@ export default function IdePage() {
                   onNodeClick={(id) => setSelectedId(id)}
                   onPaneClick={() => setSelectedId(null)}
                   onOpenCanvas={(id) => setCanvasNode(id)}
+                  thumbs={nodeThumbs}
                 />
               </div>
             )
