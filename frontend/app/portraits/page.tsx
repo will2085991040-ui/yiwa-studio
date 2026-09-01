@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { authenticatedFetch, batchGeneratePortraits } from "@/lib/api";
+import { useEffect, useState, type ReactNode } from "react";
+import { authenticatedFetch, batchGeneratePortraits, generatePortrait, generateVariantImage, getCharacter, updateCharacter } from "@/lib/api";
 
 type TVariant = {
   variant_id: string;
@@ -28,6 +28,29 @@ type TPortrait = {
 type TSection = { key: string; label: string; hint: string };
 type TCharacter = { character_id: string; name: string; role: string };
 
+type TCard = {
+  character_id: string;
+  name: string;
+  role: string;
+  age: string;
+  gender: string;
+  appearance: string;
+  personality: string[];
+  background: string;
+  motivation: string;
+  goal: string;
+  conflict: string;
+  fear: string;
+  secret: string;
+  relationship_rules: string[];
+  likes: string[];
+  dislikes: string[];
+  hidden_information: string[];
+  character_arc: string[];
+  possible_endings: string[];
+  speech_style: { tone: string; formality: string; catchphrases: string[]; quirks: string[] };
+};
+
 const EMPTY_APPEARANCE: Record<string, string> = {
   basic: "", face: "", hair: "", clothing: "", props: "", demeanor: "", pose: "", lighting: "",
 };
@@ -47,6 +70,12 @@ export default function PortraitsPage() {
   const [view, setView] = useState<{ version: number; base_prompt: string; variant_prompts: Record<string, string> } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [genBusy, setGenBusy] = useState(false);
+  const [variantBusy, setVariantBusy] = useState<string | "">("");
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardBusy, setCardBusy] = useState(false);
+  const [card, setCard] = useState<TCard | null>(null);
+  const [exportName, setExportName] = useState("");
 
   useEffect(() => {
     setProjectId(new URLSearchParams(window.location.search).get("project") ?? "");
@@ -142,6 +171,156 @@ export default function PortraitsPage() {
     }
   };
 
+  const relink = async () => {
+    if (!activeId) return;
+    const d = await (await authenticatedFetch(`/api/projects/${projectId}/characters/${activeId}/portrait`)).json();
+    setPortrait({ ...d, appearance: { ...EMPTY_APPEARANCE, ...(d.appearance ?? {}) } });
+    setView({ version: d.version, base_prompt: d.base_prompt, variant_prompts: d.variant_prompts });
+  };
+
+  // ---- 角色全部资料弹窗（编辑并保存到角色卡）----
+  const openCard = async () => {
+    if (!activeId || cardBusy) return;
+    try {
+      const d = await getCharacter(projectId, activeId);
+      const c = d?.card as Partial<TCard> | null | undefined;
+      const fields = (k: string): string[] => Array.isArray(c?.[k as keyof TCard]) ? (c?.[k as keyof TCard] as string[]) : [];
+      const base: TCard = {
+        character_id: c?.character_id || activeId,
+        name: c?.name || "",
+        role: c?.role || "",
+        age: c?.age || "",
+        gender: c?.gender || "",
+        appearance: c?.appearance || "",
+        personality: fields("personality"),
+        background: c?.background || "",
+        motivation: c?.motivation || "",
+        goal: c?.goal || "",
+        conflict: c?.conflict || "",
+        fear: c?.fear || "",
+        secret: c?.secret || "",
+        relationship_rules: fields("relationship_rules"),
+        likes: fields("likes"),
+        dislikes: fields("dislikes"),
+        hidden_information: fields("hidden_information"),
+        character_arc: fields("character_arc"),
+        possible_endings: fields("possible_endings"),
+        speech_style: {
+          tone: (c?.speech_style as { tone?: string })?.tone ?? "",
+          formality: (c?.speech_style as { formality?: string })?.formality ?? "",
+          catchphrases: Array.isArray((c?.speech_style as { catchphrases?: string[] })?.catchphrases) ? (c?.speech_style as { catchphrases: string[] }).catchphrases : [],
+          quirks: Array.isArray((c?.speech_style as { quirks?: string[] })?.quirks) ? (c?.speech_style as { quirks: string[] }).quirks : [],
+        },
+      };
+      setCard(base);
+      setCardOpen(true);
+    } catch (e) {
+      // 角色卡不存在则给空表单
+      setCard({
+        character_id: activeId, name: "", role: "", age: "", gender: "", appearance: "",
+        personality: [], background: "", motivation: "", goal: "", conflict: "", fear: "", secret: "",
+        relationship_rules: [], likes: [], dislikes: [], hidden_information: [], character_arc: [], possible_endings: [],
+        speech_style: { tone: "", formality: "", catchphrases: [], quirks: [] },
+      });
+      setCardOpen(true);
+    }
+  };
+
+  const saveCard = async () => {
+    if (!card || cardBusy) return;
+    setCardBusy(true);
+    setMsg(null);
+    try {
+      await updateCharacter(projectId, activeId, card, "立绘资料弹窗编辑角色卡");
+      setMsg({ ok: true, text: `已保存角色「${card.name || activeId}」的全部资料` });
+      // 同步角色列表与立绘名
+      const cs = await (await authenticatedFetch(`/api/projects/${projectId}/characters`)).json();
+      if (Array.isArray(cs)) setCharacters(cs);
+      setPortrait((p) => (p ? { ...p, name: card.name || p.name } : p));
+      setCardOpen(false);
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "保存角色资料失败" });
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
+  const setCardField = (k: keyof TCard, v: string | string[]) =>
+    setCard((c) => (c ? { ...c, [k]: v } : c));
+
+  const setCardList = (k: keyof TCard, raw: string) =>
+    setCard((c) => (c ? { ...c, [k]: raw.split("\n").map((x) => x.trim()).filter(Boolean) } : c));
+
+  // 名称导出打码：用「导出命名（脱敏代称）」作为输出文件名前缀，隐藏真实角色名
+  const safe = (s: string) => s.trim().replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "-").slice(0, 40) || "untitled";
+  const downloadFile = async (url: string, label: string) => {
+    const mask = safe(exportName || portrait?.name || activeId);
+    const name = `${mask}-${safe(label)}.png`;
+    try {
+      if (url.startsWith("data:")) {
+        const a = document.createElement("a");
+        a.href = url; a.download = name; a.target = "_blank"; a.rel = "noreferrer";
+        document.body.appendChild(a); a.click(); a.remove();
+        return;
+      }
+      const blob = await (await fetch(url)).blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
+  const oneClick = async (force = false) => {
+    if (!activeId || genBusy) return;
+    setGenBusy(true);
+    setMsg(null);
+    try {
+      const d = await generatePortrait(projectId, activeId, portrait?.style ?? "二次元立绘", portrait?.aspect ?? "9:16", force);
+      setMsg({ ok: true, text: `已一键生成立绘（读角色卡合成提示词）→ 已存入资产` });
+      if (d.portrait) {
+        setPortrait({ ...(d.portrait as unknown as TPortrait), appearance: { ...EMPTY_APPEARANCE, ...(d.portrait as { appearance?: Record<string, string> }).appearance ?? {} } });
+      }
+      setView({
+        version: (d.portrait as { version?: number })?.version ?? 0,
+        base_prompt: d.prompt, variant_prompts: {},
+      });
+      await relink();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "一键生成立绘失败" });
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
+  const genVariant = async (variantId: string) => {
+    if (!activeId || variantBusy) return;
+    setVariantBusy(variantId);
+    setMsg(null);
+    try {
+      const d = await generateVariantImage(projectId, activeId, variantId, {});
+      setMsg({ ok: true, text: `差分「${variantId}」已生成图片` });
+      if (d.portrait) {
+        setPortrait({ ...(d.portrait as unknown as TPortrait), appearance: { ...EMPTY_APPEARANCE, ...(d.portrait as { appearance?: Record<string, string> }).appearance ?? {} } });
+        setView({ version: (d.portrait as { version?: number })?.version ?? 0, base_prompt: d.prompt, variant_prompts: {} });
+      }
+      await relink();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "生成本差分图失败" });
+    } finally {
+      setVariantBusy("");
+    }
+  };
+
+  const imageUrl = (v: TVariant) => {
+    const img = v.image as { url?: string; data_url?: string } | null | undefined;
+    if (img?.url) return img.url;
+    if (img?.data_url) return img.data_url;
+    return "";
+  };
+
   const promote = async (variantId: string) => {
     const r = await authenticatedFetch(`/api/projects/${projectId}/characters/${activeId}/portrait/promote`, {
       method: "POST",
@@ -187,6 +366,22 @@ export default function PortraitsPage() {
         </select>
         <button onClick={save} className="ml-auto rounded bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-500">保存</button>
         <button
+          onClick={() => { void oneClick(); }}
+          disabled={genBusy || !activeId}
+          title="一键：自动读取该角色角色卡的外貌 → 合成提示词 → 生成基础立绘并存入资产"
+          className="rounded bg-sky-600 px-3 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+        >
+          {genBusy ? "● 一键生成中…" : "⚡ 一键生成立绘（读角色卡）"}
+        </button>
+        <button
+          onClick={() => { void openCard(); }}
+          disabled={!activeId || cardBusy}
+          title="弹出窗口填写/编辑该角色全部资料（姓名、身份、外貌、背景、对白风格等），保存到角色卡"
+          className="rounded border border-sky-500/50 bg-sky-500/10 px-3 py-1.5 text-sm text-sky-100 hover:bg-sky-500/20 disabled:opacity-40"
+        >
+          {cardBusy ? "…" : "✏️ 角色资料"}
+        </button>
+        <button
           onClick={batchGenerate}
           disabled={batchBusy || !activeId}
           className="rounded bg-fuchsia-600 px-3 py-1.5 text-sm hover:bg-fuchsia-500 disabled:opacity-40"
@@ -196,6 +391,51 @@ export default function PortraitsPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-2">
+        {/* 已生成立绘图 */}
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-4 lg:col-span-2">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">已生成立绘（关联角色卡 · 可做视频/图生视频首帧）</h2>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-[11px] text-slate-400" title="导出时的脱敏代称，避免在文件名里暴露真实角色名">
+                导出命名（脱敏）
+                <input value={exportName} onChange={(e) => setExportName(e.target.value)} placeholder={portrait.name || activeId} className="w-40 rounded bg-slate-800 px-2 py-1 text-[11px] text-slate-100" />
+              </label>
+              <button onClick={() => { void relink(); }} className="rounded bg-slate-700 px-2 py-1 text-xs">↻ 刷新</button>
+            </div>
+          </div>
+          {portrait.variants.filter((v) => imageUrl(v)).length === 0 ? (
+            <p className="text-[11px] text-slate-500">
+              还没有已生成的立绘图。点上方「⚡ 一键生成立绘（读角色卡）」或对下方每个差分点「🎨 生成」。
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {portrait.variants.map((v) => {
+                const url = imageUrl(v);
+                if (!url) return null;
+                return (
+                  <div key={v.variant_id} className="overflow-hidden rounded-lg border border-slate-700">
+                    <img src={url} alt={v.name} className="aspect-[9/16] w-full object-cover" loading="lazy" />
+                    <div className="px-1.5 py-1 text-[9px] text-slate-400">
+                      {v.name || v.variant_id}{v.variant_id === portrait.base_variant_id ? " · 基础" : ""} · {v.style || portrait.style}
+                    </div>
+                    <button
+                      onClick={() => { void downloadFile(url, `${v.name || v.variant_id}-立绘`); }}
+                      title={`用导出命名「${exportName || portrait.name || activeId}」作为脱敏文件名保存`}
+                      className="block w-full border-t border-slate-700 bg-slate-800 py-1 text-center text-[10px] text-slate-300 hover:bg-slate-700"
+                    >⬇ 下载（命名导出）</button>
+                    <a
+                      href={`/storyboard?project=${encodeURIComponent(projectId)}`}
+                      target="_blank" rel="noreferrer"
+                      className="block w-full border-t border-slate-700 bg-slate-800 py-1 text-center text-[10px] font-bold text-accent hover:bg-slate-700"
+                      title="去分镜页为剧情节点用这张立绘作为首帧生成视频（人物一致）"
+                    >🎬 去生成视频</a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* 8 段外貌 */}
         <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
           <div className="flex items-center justify-between">
@@ -243,6 +483,22 @@ export default function PortraitsPage() {
                 )}
               </div>
               <textarea value={v.description} onChange={(e) => setVariant(i, { description: e.target.value })} rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" placeholder="差分提示词" />
+              <div className="mt-2 flex items-center gap-2">
+                {imageUrl(v) ? (
+                  <img src={imageUrl(v)} alt={v.name} className="h-12 w-9 rounded border border-slate-700 object-cover" loading="lazy" />
+                ) : (
+                  <span className="h-12 w-9 grid place-items-center rounded border border-dashed border-slate-700 text-[10px] text-slate-600">无图</span>
+                )}
+                <button
+                  onClick={() => { void genVariant(v.variant_id); }}
+                  disabled={!!variantBusy}
+                  className="rounded bg-sky-600/80 px-2 py-1 text-xs text-white hover:bg-sky-500 disabled:opacity-40"
+                  title="用该差分提示词生成立绘图（人物一致性锁定），结果写回此差分并作为资产"
+                >
+                  {variantBusy === v.variant_id ? "● 生成中…" : "🎨 生成此差分图"}
+                </button>
+                <span className="text-[10px] text-slate-500">{v.status === "saved" && imageUrl(v) ? "已生成" : "未生成"}</span>
+              </div>
             </div>
           ))}
         </section>
@@ -263,6 +519,72 @@ export default function PortraitsPage() {
       </div>
 
       {msg && <div className="px-6 pb-6 text-sm"><span className={msg.ok ? "text-emerald-400" : "text-rose-400"}>{msg.text}</span></div>}
+
+      {/* 角色全部资料弹窗 */}
+      {cardOpen && card && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !cardBusy && setCardOpen(false)}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 text-slate-100" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold">角色全部资料 <span className="text-xs font-normal text-slate-500">（{activeId}）</span></h2>
+              <button onClick={() => setCardOpen(false)} className="rounded border border-slate-700 px-2 py-1 text-xs hover:bg-slate-800" disabled={cardBusy}>✕ 关闭</button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="姓名"><input className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.name} onChange={(e) => setCardField("name", e.target.value)} /></Field>
+              <Field label="角色定位 role">
+                <input className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.role} onChange={(e) => setCardField("role", e.target.value)} />
+              </Field>
+              <Field label="年龄"><input className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.age} onChange={(e) => setCardField("age", e.target.value)} /></Field>
+              <Field label="性别"><input className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.gender} onChange={(e) => setCardField("gender", e.target.value)} /></Field>
+            </div>
+            <Field label="外貌特征"><textarea rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.appearance} onChange={(e) => setCardField("appearance", e.target.value)} /></Field>
+            <Field label="性格标签（每行一个）"><textarea rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.personality.join("\n")} onChange={(e) => setCardList("personality", e.target.value)} /></Field>
+            <Field label="背景故事"><textarea rows={3} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.background} onChange={(e) => setCardField("background", e.target.value)} /></Field>
+            <Field label="动机"><textarea rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.motivation} onChange={(e) => setCardField("motivation", e.target.value)} /></Field>
+            <Field label="目标 / 冲突 / 恐惧 / 秘密">
+              <div className="grid grid-cols-2 gap-2">
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="目标" value={card.goal} onChange={(e) => setCardField("goal", e.target.value)} />
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="冲突" value={card.conflict} onChange={(e) => setCardField("conflict", e.target.value)} />
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="恐惧" value={card.fear} onChange={(e) => setCardField("fear", e.target.value)} />
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="秘密" value={card.secret} onChange={(e) => setCardField("secret", e.target.value)} />
+              </div>
+            </Field>
+            <Field label="喜好（每行一个）"><textarea rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.likes.join("\n")} onChange={(e) => setCardList("likes", e.target.value)} /></Field>
+            <Field label="厌恶（每行一个）"><textarea rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.dislikes.join("\n")} onChange={(e) => setCardList("dislikes", e.target.value)} /></Field>
+            <Field label="对白风格">
+              <div className="grid grid-cols-2 gap-2">
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="语气基调" value={card.speech_style.tone} onChange={(e) => setCard((c) => (c ? { ...c, speech_style: { ...c.speech_style, tone: e.target.value } } : c))} />
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="正式程度" value={card.speech_style.formality} onChange={(e) => setCard((c) => (c ? { ...c, speech_style: { ...c.speech_style, formality: e.target.value } } : c))} />
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="口头禅(逗号分隔)" value={card.speech_style.catchphrases.join(",")} onChange={(e) => setCard((c) => (c ? { ...c, speech_style: { ...c.speech_style, catchphrases: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) } } : c))} />
+                <input className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="口癖(逗号分隔)" value={card.speech_style.quirks.join(",")} onChange={(e) => setCard((c) => (c ? { ...c, speech_style: { ...c.speech_style, quirks: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) } } : c))} />
+              </div>
+            </Field>
+            <Field label="关系行为规则（每行一个）"><textarea rows={2} className="w-full rounded bg-slate-800 px-2 py-1 text-sm" value={card.relationship_rules.join("\n")} onChange={(e) => setCardList("relationship_rules", e.target.value)} /></Field>
+            <Field label="隐藏信息 / 角色弧光 / 可达结局">
+              <div className="grid grid-cols-3 gap-2">
+                <textarea className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="隐藏信息(每行一条)" rows={3} value={card.hidden_information.join("\n")} onChange={(e) => setCardList("hidden_information", e.target.value)} />
+                <textarea className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="角色弧光(每行一条)" rows={3} value={card.character_arc.join("\n")} onChange={(e) => setCardList("character_arc", e.target.value)} />
+                <textarea className="rounded bg-slate-800 px-2 py-1 text-sm" placeholder="可达结局(每行一条)" rows={3} value={card.possible_endings.join("\n")} onChange={(e) => setCardList("possible_endings", e.target.value)} />
+              </div>
+            </Field>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setCardOpen(false)} className="rounded border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800">取消</button>
+              <button onClick={() => { void saveCard(); }} disabled={cardBusy} className="rounded bg-emerald-600 px-4 py-1.5 text-sm hover:bg-emerald-500 disabled:opacity-40">
+                {cardBusy ? "保存中…" : "保存角色资料"}
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] text-slate-500">保存后写入角色卡，供剧情/立绘/分镜的一致性 & AI 生成复用。</p>
+          </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="mb-2 block text-xs text-slate-400">
+      <span className="mb-0.5 block font-semibold text-slate-300">{label}</span>
+      {children}
+    </label>
   );
 }

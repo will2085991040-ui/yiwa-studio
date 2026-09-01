@@ -71,6 +71,7 @@ class VideoJob(BaseModel):
     video_url: str = Field(default="", max_length=2000)
     provider: str = Field(default="mock", max_length=40)
     aspect_ratio: str = Field(default="16:9", max_length=10, description="16:9 横屏 / 9:16 竖屏")
+    error: str = Field(default="", max_length=2000, description="失败原因（厂商返回的真实错误文案）")
 
 
 def storyboard_template() -> dict:

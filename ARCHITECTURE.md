@@ -9,6 +9,7 @@
 | 全局架构与 Agent 体系 | [docs/architecture.md](docs/architecture.md) |
 | 点数计费怎么实现(含收费流图) | [docs/billing-architecture.md](docs/billing-architecture.md) |
 | 能力矩阵(逐条 implemented/planned) | [docs/career-capability-matrix.md](docs/career-capability-matrix.md) |
+| 分镜逐镜头生成 + 页面剪辑成片(ffmpeg) | [docs/film-pipeline.md](docs/film-pipeline.md) |
 | 怎么跑/打包 | README「启动」「打包」 |
 | CI | .github/workflows/ci.yml (ruff + pytest + 前端 build) |
 

@@ -108,7 +108,7 @@ async def submit_video(request, resolution="720p"):
         if provider == "minimax":
             return await _submit_minimax(cfg, request)
         if provider == "metaso_minimax":
-            return await _submit_metaso(cfg, request)
+            return await _submit_metaso(cfg, request, resolution)
     except MediaError:
         raise
     except Exception as exc:
@@ -143,7 +143,7 @@ async def _submit_minimax(cfg, request):
     if request.ref_image_last:
         content.append({'type': 'image_url', 'image_url': {'url': request.ref_image_last}, 'role': 'last_frame'})
     payload = {'model': cfg['model'] or 'minimax-video-h3', 'content': content,
-               'resolution': '768P', 'duration': max(1, min(int(request.duration_seconds or 5), 10))}
+               'resolution': '768P', 'duration': max(4, min(15, int(request.duration_seconds or 5)))}
     if request.aspect_ratio in ("16:9", "9:16", "4:3", "3:4"):
         payload['ratio'] = request.aspect_ratio
     async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:
@@ -158,7 +158,7 @@ async def _submit_minimax(cfg, request):
     return VideoTask(provider='minimax', model=cfg['model'] or 'minimax-video-h3', task_id=str(task_id), status='queued')
 
 
-async def _submit_metaso(cfg, request):
+async def _submit_metaso(cfg, request, resolution=None):
     # 秘塔/MiniMax 视频: POST {base}/api/minimax/v2/video_generation（已实测 key 有效返回 task_id）
     url = cfg['base_url'] + '/api/minimax/v2/video_generation'
     from app.media.styles import decorate
@@ -168,8 +168,10 @@ async def _submit_metaso(cfg, request):
         content.append({'type': 'image_url', 'image_url': {'url': request.ref_image}, 'role': 'first_frame'})
     if request.ref_image_last:
         content.append({'type': 'image_url', 'image_url': {'url': request.ref_image_last}, 'role': 'last_frame'})
+    res = _minimax_resolution(resolution)
+    dur = max(4, min(15, int(request.duration_seconds or 5)))
     payload = {'model': cfg['model'] or 'MiniMax-H3', 'content': content,
-               'resolution': '2K', 'duration': max(1, min(int(request.duration_seconds or 5), 10))}
+               'resolution': res, 'duration': dur}
     if request.aspect_ratio in ('16:9', '9:16', '4:3', '3:4'):
         payload['ratio'] = request.aspect_ratio
     async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:
@@ -203,22 +205,44 @@ async def _submit_yiwa(cfg, request):
 async def _submit_dashscope(cfg, request, resolution):
     if not (request.prompt or "").strip():
         raise MediaError("生成视频需要prompt")
-    params = {}
-    resolution = (resolution or "720p").strip().lower()
-    if resolution in _SUPPORTED_RES and resolution != "auto":
-        params["resolution"] = resolution
-    payload = {"model": cfg["model"], "input": {"text": request.prompt}, "parameters": params}
+    # DashScope happyhorse-1.1-t2v 官方 schema（实测返回的必填项）：
+    #   input.prompt 必填；parameters.resolution 仅允许 '480P'/'720P'/'1080P'（大写+P，非宽*高）。
+    # 旧代码用 input.text / positive_prompt / 1280*720 会被百炼拒绝 => 必然失败，这里改为官方格式。
+    params = {"watermark": False}
+    dres = _dashscope_resolution(resolution, request.aspect_ratio)
+    if dres:
+        params["resolution"] = dres
+    payload = {
+        "model": cfg["model"],
+        "input": {"prompt": request.prompt},
+        "parameters": params,
+    }
     headers = {**{"Authorization": "Bearer " + (cfg["api_key"] or "")}, "X-DashScope-Async": "enable"}
     async with httpx.AsyncClient(timeout=max(60, settings.llm_timeout_seconds)) as client:
         resp = await client.post(_DASHSCOPE_SUBMIT, json=payload, headers=headers)
     if resp.status_code >= 400:
-        raise MediaError("生视频提交错误(" + str(resp.status_code) + "):" + resp.text[:300])
+        raise MediaError("生视频提交错误(" + str(resp.status_code) + "):" + resp.text[:500])
     data = _as_json(resp)
     out = data.get("output") or {}
     task_id = out.get("task_id") or data.get("request_id")
     if not task_id:
         raise MediaError("生视频提交未返回任务id:" + resp.text[:300])
     return VideoTask(provider="dashscope", model=cfg["model"], task_id=str(task_id), status="queued")
+
+
+def _dashscope_resolution(fallback="", aspect_ratio=""):
+    """happyhorse-1.1-t2v 只接受 '480P'/'720P'/'1080P'（大写+p）。默认 720P。"""
+    r = (fallback or "").strip().lower().replace("p", "")
+    table = {"480": "480P", "540": "720P", "720": "720P", "1080": "1080P", "2k": "1080P", "4k": "1080P"}
+    return table.get(r, "720P")
+
+
+def _minimax_resolution(r=""):
+    """MiniMax 视频分辨率归一化：默认 768P。接受 480P/720P/768P/1080P/2K/4K。"""
+    norm = (r or "").strip().lower().replace(" ", "").replace("p", "")
+    table = {"480": "480P", "4802": "4802P", "540": "720P", "720": "720P", "768": "768P",
+             "1080": "1080P", "2k": "2K", "4k": "4K"}
+    return table.get(norm, "768P")
 
 
 async def poll_video(task_id, task=None):
@@ -237,8 +261,9 @@ async def poll_video(task_id, task=None):
         elif provider == "minimax":
             url = cfg["base_url"] + "/wand/minimax-video-v2/tasks/" + task_id
         elif provider == "metaso_minimax":
-            # 秘塔查询端点以 query_path 为准（{task} 占位）；提交侧已实测 200+task_id
-            qp = cfg.get("query_path") or "/api/minimax/v2/video_generation/{task}"
+            # 秘塔/MiniMax 查询端点：GET {base}/api/minimax/v2/query/video_generation/{task}
+            # （实测返回的 task 结构 {"task":{...status/content.url}}，见下方 status/url 提取）
+            qp = cfg.get("query_path") or "/api/minimax/v2/query/video_generation/{task}"
             url = cfg["base_url"] + qp.replace("{task}", task_id)
         else:
             url = cfg["base_url"] + "/v1/videos/generations/" + task_id
@@ -251,6 +276,9 @@ async def poll_video(task_id, task=None):
         raise
     except httpx.HTTPError as exc:
         raise MediaError("生视频查询失败:" + str(exc)) from exc
+    # 秘塔查询返回 {"task": {...}}，把内层 task 解出来再取 status/url
+    if provider == "metaso_minimax" and isinstance(data.get("task"), dict):
+        data = data["task"]
     status = _normal_status(data.get("status", "queued"))
     return VideoResult(provider=provider, model=cfg["model"], task_id=task_id, status=status,
                        video_url=_video_url_from(data),

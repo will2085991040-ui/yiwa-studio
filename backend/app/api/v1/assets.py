@@ -14,7 +14,7 @@ router = APIRouter()
 _LABEL = {
     "story_graph": "剧本", "story": "故事大纲", "world": "世界观", "world_bible": "世界观",
     "character_card": "角色卡", "character_portrait": "角色立绘",
-    "storyboard": "分镜", "video_job": "视频", "scene": "场景",
+    "node_image": "节点画面", "storyboard": "分镜", "video_job": "视频", "scene": "场景",
     "dialogue": "对白", "choice": "选择", "ending": "结局",
     "relationship_graph": "关系图", "image": "图片", "audio": "音频",
 }
@@ -82,7 +82,9 @@ def _type(kind, cnt):
     base = kind.split(":")[0]
     if base in ("video", "video_job"):
         return "video"
-    if base in ("character_portrait", "portrait", "image"):
+    if base in ("video", "video_job"):
+        return "video"
+    if base in ("character_portrait", "portrait", "node_image", "image"):
         return "image"
     raw = str(cnt)[:2000]
     if "data:image" in raw:

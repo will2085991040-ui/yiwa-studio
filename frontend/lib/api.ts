@@ -337,6 +337,36 @@ export function batchGeneratePortraits(projectId: string, characterIds?: string[
     }));
 }
 
+// ---- 角色立绘：一键生成（读角色卡）/ 差分生图 / 视频参考帧 ----
+export type GeneratePortraitOut = {
+  portrait: Record<string, unknown>;
+  image_url: string;
+  prompt: string;
+};
+/** 一键生成立绘：自动读取该角色的角色卡外貌，合成提示词生成并落库为资产。 */
+export function generatePortrait(projectId: string, characterId: string, style = "anime", aspect = "9:16", force = false) {
+  return aiBusy("一键生成立绘", `${characterId} · 读取角色卡 → 合成 → 生成…`,
+    req<GeneratePortraitOut>(`/api/projects/${projectId}/characters/${characterId}/portrait/generate`, {
+      method: "POST", body: JSON.stringify({ style, aspect, force }),
+    }));
+}
+/** 为某个差分生成立绘图并写回 portrait.variants[i].image。 */
+export function generateVariantImage(
+  projectId: string, characterId: string, variantId: string, payload: { size?: string; ref_image?: string } = {},
+) {
+  return aiBusy("差分生图", `${variantId} · 人物一致性锁定…`,
+    req<{ portrait: Record<string, unknown>; prompt: string; image: Record<string, unknown> }>(
+      `/api/projects/${projectId}/characters/${characterId}/portrait/variants/${encodeURIComponent(variantId)}/image`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ));
+}
+/** 取角色已保存立绘 URL，作为图生视频首帧（人物一致）。 */
+export function portraitVideoRef(projectId: string, characterId: string) {
+  return req<{ character_id: string; ref_image: string; has_portrait: boolean }>(
+    `/api/projects/${projectId}/characters/${characterId}/portrait/video_ref`,
+  );
+}
+
 // ---- 手动角色 CRUD（新增 / 编辑 / 删除一张角色卡） ----
 export function listCharacters(projectId: string) {
   return req<

@@ -159,7 +159,10 @@ function AssetViewer({ asset, onClose }: { asset: AssetOut; onClose: () => void 
           </div>
           <div className="flex items-center gap-1">
             {asset.url && (
-              <a href={asset.url} target="_blank" rel="noreferrer" className="rounded-md border border-white/20 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">打开链接 ↗</a>
+              <>
+                <a href={asset.url} download className="rounded-md border border-white/20 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10" title="保存到本地">⬇ 下载</a>
+                <a href={asset.url} target="_blank" rel="noreferrer" className="rounded-md border border-white/20 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10">打开链接 ↗</a>
+              </>
             )}
             <button onClick={onClose} className="rounded-md border border-white/10 px-2 py-1 text-xs text-slate-400 hover:bg-white/10">✕</button>
           </div>

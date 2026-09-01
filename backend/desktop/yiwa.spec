@@ -18,13 +18,15 @@ hiddenimports += collect_submodules("alembic")
 hiddenimports += collect_submodules("webview")
 hiddenimports += collect_submodules("pythonnet")
 hiddenimports += collect_submodules("clr_loader")
+# ffmpeg（imageio-ffmpeg 自带的静态二进制）用于离线合成完整成片
+hiddenimports += collect_submodules("imageio_ffmpeg")
 
 # 打进 EXE 的外部资源：前端静态产物 / Alembic 迁移脚本 / alembic.ini
 datas = [
     (os.path.join(repo_root, "frontend", "out"), "frontend_out"),
     (os.path.join(backend_dir, "alembic"), "alembic"),
     (os.path.join(backend_dir, "alembic.ini"), "."),
-]
+] + collect_data_files("imageio_ffmpeg")
 
 # pywebview / WebView2 桌面窗口所需的额外资源与原生库
 datas_extra = collect_data_files("webview")

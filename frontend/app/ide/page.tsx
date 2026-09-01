@@ -173,6 +173,16 @@ export default function IdePage() {
               >
                 🎨 小画布{selectedId ? "" : "（先选节点）"}
               </button>
+              {selectedId && (
+                <a
+                  href={`/node-canvas?project=${encodeURIComponent(projectId)}&node=${encodeURIComponent(selectedId)}`}
+                  target="_blank" rel="noreferrer"
+                  title={`以独立全屏页面打开「${selected?.data.title ?? selectedId}」的小画布`}
+                  className="rounded-lg border border-purple-400/40 bg-purple-500/10 px-2 py-1 text-xs text-purple-200 hover:bg-purple-500/20"
+                >
+                  🖥 全屏小画布
+                </a>
+              )}
               <button onClick={() => ide.addNode("scene")} className="rounded-lg border border-white/10 bg-panel2 px-2 py-1 text-xs hover:bg-white/5">
                 + 剧情
               </button>

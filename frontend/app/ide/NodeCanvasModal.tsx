@@ -28,9 +28,13 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
   const [err, setErr] = useState("");
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("");
+  const [styleCustom, setStyleCustom] = useState(false);
+  const [customStyle, setCustomStyle] = useState("");
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("9:16");
   const [videoBusy, setVideoBusy] = useState(false);
   const [videoMsg, setVideoMsg] = useState("");
+
+  const effStyle = () => (styleCustom ? customStyle.trim() : style);
 
   const load = useCallback(async () => {
     if (!open || !projectId || !nodeId) return;
@@ -58,7 +62,7 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
     setBusy(true);
     setErr("");
     try {
-      await createNodeImage(projectId, nodeId, { prompt: prompt.trim(), style, aspect });
+      await createNodeImage(projectId, nodeId, { prompt: prompt.trim(), style: effStyle(), aspect });
       await load();
     } catch (e) {
       setErr(String((e as Error).message ?? e));
@@ -79,7 +83,7 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
         await storyboardBreakdown(projectId, nodeId, 4);
         setVideoMsg("拆镜完成，正在用这张图生成视频…");
       }
-      await generateStoryboardVideo(projectId, nodeId, { aspect_ratio: aspect, ref_image: refImage, style });
+      await generateStoryboardVideo(projectId, nodeId, { aspect_ratio: aspect, ref_image: refImage, style: effStyle() });
       setVideoMsg("视频任务已提交（首帧已锁定，人物/画面一致）。请刷新查看结果。");
       await load();
     } catch (e) {
@@ -99,7 +103,7 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
     setBusy(true);
     setVideoMsg("一键成片：先文生图，再锁定它做首帧生成视频…");
     try {
-      const img = await createNodeImage(projectId, nodeId, { prompt: usePrompt, style, aspect });
+      const img = await createNodeImage(projectId, nodeId, { prompt: usePrompt, style: effStyle(), aspect });
       setPrompt(usePrompt);
       await load();
       setBusy(false);
@@ -129,6 +133,12 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
             <div className="text-[10px] uppercase tracking-widest text-slate-500">分节点小画布</div>
             <div className="text-sm font-bold">{nodeTitle} <span className="text-slate-500">({nodeId})</span></div>
           </div>
+          <a
+            href={`/node-canvas?project=${encodeURIComponent(projectId)}&node=${encodeURIComponent(nodeId)}`}
+            target="_blank" rel="noreferrer"
+            className="rounded-lg border border-white/10 bg-panel2 px-2.5 py-1.5 text-xs hover:bg-white/5"
+            title="用独立全屏页面打开这个节点的小画布，空间更大更专注"
+          >🖥 全屏</a>
           <button onClick={onClose} className="rounded-lg border border-white/10 bg-panel2 px-2.5 py-1.5 text-xs hover:bg-white/5">✕ 关闭</button>
         </div>
 
@@ -159,15 +169,27 @@ export default function NodeCanvasModal({ open, projectId, nodeId, nodeTitle, on
                 <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">画面制作（文生图 → 图生视频）</div>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
-                    value={style}
-                    onChange={(e) => setStyle(e.target.value)}
+                    value={styleCustom ? "__custom__" : style}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") setStyleCustom(true);
+                      else { setStyleCustom(false); setStyle(e.target.value); }
+                    }}
                     className="rounded-lg border border-white/10 bg-panel2 px-2 py-1.5 text-xs"
-                    title="画面风格"
+                    title="画面风格：选预设，或用「自定义」写自己的渲染关键词"
                   >
                     {styles.map((s) => (
                       <option key={s.key} value={s.key}>{s.label ?? s.key}</option>
                     ))}
+                    <option value="__custom__">✍️ 自定义…</option>
                   </select>
+                  {styleCustom && (
+                    <input
+                      value={customStyle}
+                      onChange={(e) => setCustomStyle(e.target.value)}
+                      placeholder="赛璐璐，赛伟霓虹，微距特写…"
+                      className="w-56 rounded-lg border border-white/10 bg-panel2 px-2 py-1.5 text-xs"
+                    />
+                  )}
                   <select
                     value={aspect}
                     onChange={(e) => setAspect(e.target.value as (typeof ASPECTS)[number])}

@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     video_api_key: str = ""
     video_model: str = "minimax-video-h3"    # tokenhub 视频模型（需开通后付费计费）
     # 秘塔/MiniMax 视频查询端点模板（{task} 为占位）：提交成功也会 task_id，轮询按该路径查状态。
-    video_query_path: str = "/api/minimax/v2/video_generation/{task}"
+    video_query_path: str = "/api/minimax/v2/query/video_generation/{task}"
     video_poll_interval: float = 3.0
     video_max_polls: int = 120
 

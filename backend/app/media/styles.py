@@ -69,15 +69,33 @@ def negative_extra(key: str) -> str:
 
 
 def decorate(prompt: str, style: str | None = None, negative: str = '') -> tuple[str, str]:
-    """把风格并入 prompt 前部；负面词与风格负面合并。"""
-    kw = style_keyword(style)
-    if kw:
-        prompt = (kw + ', ' + prompt) if prompt else kw
-    ex = negative_extra(style)
-    if ex and negative:
-        negative = negative + ', ' + ex
-    elif ex:
-        negative = ex
+    """把风格并入 prompt 前部；负面词与风格负面合并。
+
+    - style 命中内置预设 key → 用预设的提示词增强 / 负面词。
+    - style 是内置预设之外的任意文本（自定义风格）→ 直接把那段文本作为渲染关键词并到
+      prompt 前部；负面词仅透传用户自己的 negative（不对未知风格乱加负面词）。
+    - style 为空 → 原样返回。
+    """
+    s = (style or '').strip()
+    if not s:
+        return prompt, negative
+    key = s.lower()
+    preset = STYLE_PRESETS.get(key)
+    if preset is not None:
+        kw = preset.get('prompt', '')
+        if kw:
+            prompt = (kw + ', ' + prompt) if prompt else kw
+        ex = preset.get('negative', '')
+        if ex and negative:
+            negative = negative + ', ' + ex
+        elif ex:
+            negative = ex
+        return prompt, negative
+    # 自定义风格：直接把用户写的那段风格文本作为渲染关键词。
+    if s and prompt:
+        prompt = s + ', ' + prompt
+    elif s:
+        prompt = s
     return prompt, negative
 
 
